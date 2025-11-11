@@ -26,3 +26,4 @@ class AddRoleAndFacultyFieldsToProfiles extends Migration
     }
 }
 
+
