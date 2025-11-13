@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 // Simple Pie Chart Component
@@ -13,7 +13,7 @@ function PieChart({ data, title, colors }) {
 
     const total = Object.values(data).reduce((sum, val) => sum + val, 0);
     const entries = Object.entries(data);
-    
+
     let currentAngle = -90; // Start from top
     const radius = 80;
     const centerX = 120;
@@ -22,26 +22,26 @@ function PieChart({ data, title, colors }) {
     const paths = entries.map(([label, value], index) => {
         const percentage = (value / total) * 100;
         const angle = (value / total) * 360;
-        
+
         const startAngle = currentAngle;
         const endAngle = currentAngle + angle;
-        
+
         const x1 = centerX + radius * Math.cos((startAngle * Math.PI) / 180);
         const y1 = centerY + radius * Math.sin((startAngle * Math.PI) / 180);
         const x2 = centerX + radius * Math.cos((endAngle * Math.PI) / 180);
         const y2 = centerY + radius * Math.sin((endAngle * Math.PI) / 180);
-        
+
         const largeArcFlag = angle > 180 ? 1 : 0;
-        
+
         const pathData = [
             `M ${centerX} ${centerY}`,
             `L ${x1} ${y1}`,
             `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
             'Z'
         ].join(' ');
-        
+
         currentAngle = endAngle;
-        
+
         return {
             path: pathData,
             label,
@@ -96,8 +96,11 @@ function PieChart({ data, title, colors }) {
 
 export default function Dashboard() {
     const [user, setUser] = useState(null);
+    const [userRole, setUserRole] = useState(null);
     const [loading, setLoading] = useState(true);
     const [statistics, setStatistics] = useState(null);
+    const fetchingRef = useRef(false);
+    const mountedRef = useRef(true);
 
     const chartColors = [
         '#3B82F6', // Blue
@@ -112,52 +115,129 @@ export default function Dashboard() {
     ];
 
     useEffect(() => {
-        fetchUser();
-        fetchStatistics();
-    }, []);
+        // Only fetch user on initial mount if we don't have one
+        if (!user && !fetchingRef.current) {
+            fetchUser();
+        }
+        
+        return () => {
+            mountedRef.current = false;
+        };
+    }, []); // Empty deps - only run on mount
+    
+    // Separate effect to fetch statistics when user is available
+    useEffect(() => {
+        if (user && !statistics && !fetchingRef.current) {
+            fetchStatistics();
+        }
+    }, [user]); // Run when user changes
 
     const fetchUser = async (retryCount = 0) => {
-        const maxRetries = 2;
+        // Prevent multiple simultaneous calls
+        if (fetchingRef.current && retryCount === 0) {
+            return;
+        }
+        
+        // If we already have a user, don't fetch again
+        if (user && retryCount === 0) {
+            setLoading(false);
+            return;
+        }
+        
+        fetchingRef.current = true;
+        const maxRetries = 3;
+        
         try {
             const response = await axios.get('/api/user', {
                 withCredentials: true
             });
+            
+            // Check if component is still mounted
+            if (!mountedRef.current) {
+                fetchingRef.current = false;
+                return;
+            }
+            
             if (response.data && response.data.id) {
-                setUser(response.data);
-                setLoading(false);
-            } else {
-                if (retryCount < maxRetries) {
-                    setTimeout(() => fetchUser(retryCount + 1), 500);
+                // Redirect non-admin users to account dashboard
+                if (response.data.role !== 'admin') {
+                    window.location.href = '/account-dashboard';
                     return;
                 }
+                setUser(response.data);
+                setUserRole(response.data.role || null);
                 setLoading(false);
-                window.location.href = '/login';
+                fetchingRef.current = false;
+                // Fetch statistics after successful user fetch
+                fetchStatistics();
+                return true; // Success
+            } else {
+                // If response exists but no user data, only redirect after all retries
+                if (retryCount < maxRetries) {
+                    fetchingRef.current = false;
+                    setTimeout(() => fetchUser(retryCount + 1), 500);
+                    return false;
+                }
+                // Only redirect if we're not already on login page and component is mounted
+                // Also check if we have a session cookie - if we do, don't redirect
+                setLoading(false);
+                fetchingRef.current = false;
+                const hasSession = document.cookie.includes('laravel_session') || document.cookie.includes('_session');
+                if (mountedRef.current && !hasSession && window.location.pathname !== '/login' && window.location.pathname !== '/') {
+                    window.location.href = '/login';
+                }
+                return false;
             }
         } catch (error) {
+            // Check if component is still mounted
+            if (!mountedRef.current) {
+                fetchingRef.current = false;
+                return;
+            }
+            
             if (error.response) {
                 const status = error.response.status;
+                // Only redirect on authentication errors after all retries
                 if (status === 401 || status === 403) {
                     if (retryCount < maxRetries) {
+                        fetchingRef.current = false;
                         setTimeout(() => fetchUser(retryCount + 1), 500);
-                        return;
+                        return false;
                     }
                     setLoading(false);
-                    window.location.href = '/login';
+                    fetchingRef.current = false;
+                    // Only redirect if we're not already on login page and component is mounted
+                    // Also check if we have a session cookie - if we do, don't redirect
+                    const hasSession = document.cookie.includes('laravel_session') || document.cookie.includes('_session');
+                    if (mountedRef.current && !hasSession && window.location.pathname !== '/login' && window.location.pathname !== '/') {
+                        window.location.href = '/login';
+                    }
+                    return false;
                 } else {
-                    // For other errors, retry once
+                    // For other HTTP errors (500, 404, etc.), don't redirect - just retry
                     if (retryCount < maxRetries) {
-                        setTimeout(() => fetchUser(retryCount + 1), 500);
-                        return;
+                        fetchingRef.current = false;
+                        setTimeout(() => fetchUser(retryCount + 1), 1000);
+                        return false;
                     }
+                    // Don't redirect on server errors - user might still be authenticated
+                    // But also don't fetch statistics if we can't verify user
                     setLoading(false);
+                    fetchingRef.current = false;
+                    return false;
                 }
             } else {
-                // Network error - retry
+                // Network error - retry with longer delay
                 if (retryCount < maxRetries) {
+                    fetchingRef.current = false;
                     setTimeout(() => fetchUser(retryCount + 1), 1000);
-                    return;
+                    return false;
                 }
+                // Don't redirect on network errors - session might still be valid
+                // But also don't fetch statistics if we can't verify user
                 setLoading(false);
+                fetchingRef.current = false;
+                return false;
             }
         }
     };
@@ -170,12 +250,11 @@ export default function Dashboard() {
             setStatistics(response.data);
         } catch (error) {
             console.error('Error fetching statistics:', error);
-            if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-                window.location.href = '/login';
-            }
-        } finally {
-            setLoading(false);
+            // Don't redirect on statistics errors - user might still be authenticated
+            // Statistics failure shouldn't prevent dashboard access
+            // Only log the error and continue
         }
+        // Note: Don't set loading to false here - let fetchUser handle that
     };
 
     const handleLogout = async (e) => {
@@ -234,12 +313,16 @@ export default function Dashboard() {
                         </div>
                         {/* Navigation */}
                         <div className="hidden md:flex gap-10 text-lg font-medium">
-                            <a href="/dashboard" className="text-gray-800 hover:text-blue-600 transition">Dashboard</a>
-                            <a href="/faculty" className="text-gray-800 hover:text-blue-600 transition">Faculty</a>
-                            <a href="/students" className="text-gray-800 hover:text-blue-600 transition">Students</a>
-                            <a href="/reports" className="text-gray-800 hover:text-blue-600 transition">Reports</a>
-                            <a href="/settings" className="text-gray-800 hover:text-blue-600 transition">Settings</a>
-                            <a href="/profile" className="text-gray-800 hover:text-blue-600 transition">Profile</a>
+                            <a href="/dashboard" className="text-gray-800 hover:text-blue-600">Dashboard</a>
+                            {userRole === 'admin' && (
+                                <>
+                                    <a href="/faculty" className="text-gray-800 hover:text-blue-600">Faculty</a>
+                                    <a href="/students" className="text-gray-800 hover:text-blue-600">Students</a>
+                                    <a href="/reports" className="text-gray-800 hover:text-blue-600">Reports</a>
+                                    <a href="/settings" className="text-gray-800 hover:text-blue-600">System Settings</a>
+                                </>
+                            )}
+                            <a href="/profile" className="text-gray-800 hover:text-blue-600">Profile</a>
                         </div>
                         <div>
                             <form onSubmit={handleLogout}>
@@ -346,49 +429,44 @@ export default function Dashboard() {
 
                     {/* Quick Actions */}
                     <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Faculty</h2>
-                            <p className="text-sm text-gray-500 mb-4">Manage faculty records, assignments, and schedules.</p>
-                            <a href="/faculty" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Faculty
-                            </a>
-                        </div>
+                        {userRole === 'admin' && (
+                            <>
+                                <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
+                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">Faculty</h2>
+                                    <p className="text-sm text-gray-500 mb-4">Manage faculty records, assignments, and schedules.</p>
+                                    <a href="/faculty" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
+                                        Go to Faculty
+                                    </a>
+                                </div>
 
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Students</h2>
-                            <p className="text-sm text-gray-500 mb-4">View, enroll, and update student information.</p>
-                            <a href="/students" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Students
-                            </a>
-                        </div>
+                                <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
+                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">Students</h2>
+                                    <p className="text-sm text-gray-500 mb-4">View, enroll, and update student information.</p>
+                                    <a href="/students" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
+                                        Go to Students
+                                    </a>
+                                </div>
 
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Reports</h2>
-                            <p className="text-sm text-gray-500 mb-4">Generate academic and administrative reports.</p>
-                            <a href="/reports" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Reports
-                            </a>
-                        </div>
+                                <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
+                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">Reports</h2>
+                                    <p className="text-sm text-gray-500 mb-4">Generate academic and administrative reports.</p>
+                                    <a href="/reports" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
+                                        Go to Reports
+                                    </a>
+                                </div>
 
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Registrar Tools</h2>
-                            <p className="text-sm text-gray-500 mb-4">Access core registrar management functions.</p>
-                            <a href="/dashboard" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Open Tools
-                            </a>
-                        </div>
-
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Settings</h2>
-                            <p className="text-sm text-gray-500 mb-4">Update portal configurations and preferences.</p>
-                            <a href="/settings" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Settings
-                            </a>
-                        </div>
-
+                                <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
+                                    <h2 className="text-xl font-semibold text-gray-700 mb-2">System Settings</h2>
+                                    <p className="text-sm text-gray-500 mb-4">Update portal configurations and preferences.</p>
+                                    <a href="/settings" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
+                                        Go to System Settings
+                                    </a>
+                                </div>
+                            </>
+                        )}
                         <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
                             <h2 className="text-xl font-semibold text-gray-700 mb-2">Profile</h2>
-                            <p className="text-sm text-gray-500 mb-4">Manage your account and profile details.</p>
+                            <p className="text-sm text-gray-500 mb-4">View and update your profile information.</p>
                             <a href="/profile" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
                                 Go to Profile
                             </a>

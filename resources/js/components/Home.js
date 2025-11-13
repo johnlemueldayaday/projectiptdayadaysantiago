@@ -15,7 +15,7 @@ export default function Home() {
 
     useEffect(() => {
         fetchUser();
-        
+
         // Auto-slide carousel
         const interval = setInterval(() => {
             setCurrentSlide((prev) => (prev + 1) % slides.length);
@@ -90,7 +90,7 @@ export default function Home() {
         try {
             // Get CSRF token from meta tag
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-            
+
             await axios.post('/api/logout', {}, {
                 headers: {
                     'X-CSRF-TOKEN': csrfToken || window.axios.defaults.headers.common['X-CSRF-TOKEN']

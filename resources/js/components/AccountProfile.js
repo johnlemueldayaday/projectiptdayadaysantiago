@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 
-export default function Profile() {
+export default function AccountProfile() {
     const [user, setUser] = useState(null);
     const [profile, setProfile] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -69,9 +69,9 @@ export default function Profile() {
                 withCredentials: true
             });
             if (response.data && response.data.id) {
-                // Redirect non-admin users to account profile
-                if (response.data.role !== 'admin') {
-                    window.location.href = '/account-profile';
+                // Redirect admin users to admin profile
+                if (response.data.role === 'admin') {
+                    window.location.href = '/profile';
                     return;
                 }
                 setUser(response.data);
@@ -383,14 +383,10 @@ export default function Profile() {
                                 </span>
                             </div>
                         </div>
-                        {/* Navigation - Admin only */}
+                        {/* Navigation - Only Dashboard and Profile for students/faculty */}
                         <div className="hidden md:flex gap-10 text-lg font-medium">
-                            <a href="/dashboard" className="text-gray-800 hover:text-blue-600">Dashboard</a>
-                            <a href="/faculty" className="text-gray-800 hover:text-blue-600">Faculty</a>
-                            <a href="/students" className="text-gray-800 hover:text-blue-600">Students</a>
-                            <a href="/reports" className="text-gray-800 hover:text-blue-600">Reports</a>
-                            <a href="/settings" className="text-gray-800 hover:text-blue-600">System Settings</a>
-                            <a href="/profile" className="text-gray-800 hover:text-blue-600">Profile</a>
+                            <a href="/account-dashboard" className="text-gray-800 hover:text-blue-600">Dashboard</a>
+                            <a href="/account-profile" className="text-gray-800 hover:text-blue-600">Profile</a>
                         </div>
                         <div>
                             <form onSubmit={handleLogout}>

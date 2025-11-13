@@ -1,9 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import Welcome from './Welcome';
 import Login from './Login';
+import AdminLogin from './AdminLogin';
 import Register from './Register';
 import Home from './Home';
 import Profile from './Profile';
+import AccountProfile from './AccountProfile';
+import AccountDashboard from './AccountDashboard';
 import Students from './Students';
 import Dashboard from './Dashboard';
 import Faculty from './Faculty';
@@ -68,6 +71,9 @@ export default function App() {
         if (normalizedPath === '/login') {
             return <Login />;
         }
+        if (normalizedPath === '/admin-login') {
+            return <AdminLogin />;
+        }
         if (normalizedPath === '/register') {
             return <Register />;
         }
@@ -76,6 +82,12 @@ export default function App() {
         }
         if (normalizedPath === '/profile') {
             return <Profile />;
+        }
+        if (normalizedPath === '/account-profile') {
+            return <AccountProfile />;
+        }
+        if (normalizedPath === '/account-dashboard') {
+            return <AccountDashboard />;
         }
         if (normalizedPath === '/students') {
             return <Students />;

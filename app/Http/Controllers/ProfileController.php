@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use App\Models\Profile;
 class ProfileController extends Controller
@@ -12,7 +13,7 @@ class ProfileController extends Controller
         $user = Auth::user();
         $profile = Profile::firstOrCreate(
             ['user_id' => $user->id],
-            ['email' => $user->email] 
+            ['email' => $user->email]
         );
 
         return view('profile', compact('profile'));
@@ -54,12 +55,12 @@ class ProfileController extends Controller
         if (!Auth::check()) {
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
-        
+
         $user = Auth::user();
 
         // Check if profile exists first to preserve role
         $profile = Profile::where('user_id', $user->id)->first();
-        
+
         if (!$profile) {
             // Create new profile - check if there's a role in the request or default to student
             $role = $request->input('role', 'student');
@@ -94,22 +95,22 @@ class ProfileController extends Controller
     {
         // Check authentication - middleware should handle this, but double-check
         if (!Auth::check()) {
-            \Log::warning('Profile update attempted without authentication', [
+            Log::warning('Profile update attempted without authentication', [
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent()
             ]);
             return response()->json(['error' => 'Unauthenticated', 'message' => 'Please log in to update your profile.'], 401);
         }
-        
+
         $user = Auth::user();
-        
+
         // Additional safety check
         if (!$user || !$user->id) {
             return response()->json(['error' => 'Unauthenticated', 'message' => 'Invalid user session.'], 401);
         }
 
         $profile = Profile::firstOrNew(['user_id' => $user->id]);
-        
+
         // Basic fields
         $profile->first_name     = $request->first_name;
         $profile->middle_name    = $request->middle_name;
@@ -122,21 +123,21 @@ class ProfileController extends Controller
         $profile->civil_status   = $request->civil_status;
         $profile->email          = $request->email;
         $profile->birthday       = $request->birthday;
-        
+
         // Auto-generate ID number if not set
         if (!$profile->id_number) {
             $role = $profile->role ?: ($request->role ?: 'student');
             $profile->id_number = $this->generateIdNumber($role);
         }
-        
+
         // Role-specific fields - preserve existing role if not explicitly changed
         $existingRole = $profile->role;
         $requestRole = $request->input('role');
-        
+
         // Determine role: use request role if provided, otherwise keep existing role, default to student
         $finalRole = $requestRole ?: $existingRole ?: 'student';
         $profile->role = $finalRole;
-        
+
         if ($finalRole === 'faculty') {
             $profile->graduated_school = $request->graduated_school;
             $profile->year_graduated = $request->year_graduated;
@@ -183,7 +184,7 @@ class ProfileController extends Controller
                 ], 422);
             }
         }
-        
+
         $profile->user_id = $user->id;
         $profile->save();
 

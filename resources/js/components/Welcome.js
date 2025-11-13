@@ -92,7 +92,7 @@ export default function Welcome() {
                                     <a href="#" className="text-gray-800 hover:text-blue-600">Students</a>
                                     <a href="#" className="text-gray-800 hover:text-blue-600">Reports</a>
                                     <a href="#" className="text-gray-800 hover:text-blue-600">Settings</a>
-                                    <a href="/profile" className="text-gray-800 hover:text-blue-600">Profile</a>
+
                                 </div>
                                 <div>
                                     <form method="POST" action="/api/logout" onSubmit={handleLogout}>
@@ -162,6 +162,9 @@ export default function Welcome() {
                                             <a href="/login" className="block text-center py-2 px-3 rounded-md border border-gray-200 text-gray-700 bg-white hover:bg-yellow-500 hover:text-white hover:border-yellow-500 transition duration-300 ease-in-out">
                                                 Log in
                                             </a>
+                                            <a href="/admin-login" className="block text-center py-2 px-3 rounded-md border border-gray-200 text-gray-700 bg-white hover:bg-blue-600 hover:text-white hover:border-blue-600 transition duration-300 ease-in-out">
+                                                Admin Login
+                                            </a>
                                         </div>
                                     </div>
                                     {/* News */}
@@ -196,7 +199,7 @@ export default function Welcome() {
                         <div>
                             <h3 className="text-lg font-semibold mb-3">About IHS Portal</h3>
                             <p className="text-sm text-gray-200 leading-relaxed">
-                                The IHS Portal provides students, faculty, and administrators with easy access 
+                                The IHS Portal provides students, faculty, and administrators with easy access
                                 to registrar tools, resources, and announcements. Our mission is to deliver efficiency and transparency in academic services.
                             </p>
                         </div>

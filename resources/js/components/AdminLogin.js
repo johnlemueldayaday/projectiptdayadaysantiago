@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 
-export default function Login() {
+export default function AdminLogin() {
     const [formData, setFormData] = useState({
-        email: '',
+        username: '',
         password: '',
         remember: false
     });
@@ -32,24 +32,15 @@ export default function Login() {
         setErrors({});
 
         try {
-            const response = await axios.post('/api/login', formData, {
+            const response = await axios.post('/api/admin-login', formData, {
                 withCredentials: true
             });
             if (response.data.success) {
                 // Wait a moment for session to be established
                 await new Promise(resolve => setTimeout(resolve, 300));
 
-                // Check if profile needs to be completed and user role
-                const needsProfile = response.data.needsProfile;
-                const userRole = response.data.role;
-                
-                // Students and faculty go to account pages, admin goes to admin pages
-                let redirectPath;
-                if (userRole === 'admin') {
-                    redirectPath = needsProfile ? '/profile' : '/dashboard';
-                } else {
-                    redirectPath = needsProfile ? '/account-profile' : '/account-dashboard';
-                }
+                // Admin always goes to dashboard
+                const redirectPath = '/dashboard';
 
                 // Trigger App.js routing by updating the path
                 window.dispatchEvent(new CustomEvent('navigate', { detail: { path: redirectPath } }));
@@ -69,7 +60,7 @@ export default function Login() {
             if (error.response?.data?.errors) {
                 setErrors(error.response.data.errors);
             } else {
-                setErrors({ email: error.response?.data?.message || 'Invalid credentials.' });
+                setErrors({ username: error.response?.data?.message || 'Invalid credentials.' });
             }
             setLoading(false);
         }
@@ -86,28 +77,29 @@ export default function Login() {
             <div className="w-full max-w-6xl bg-white card-radius shadow-lg overflow-hidden flex flex-col lg:flex-row">
                 {/* Left Panel (Info Section) */}
                 <div className="hidden lg:flex lg:w-2/3 brand-blue text-white p-8 xl:p-12 flex-col gap-6">
-                    <h2 className="text-3xl xl:text-4xl font-bold tracking-tight font-heading italic">IHS Admin</h2>
+                    <h2 className="text-3xl xl:text-4xl font-bold tracking-tight font-heading italic">Admin Portal</h2>
 
                     <div className="mt-2 text-sm leading-relaxed font-body">
                         <p className="mb-4">
-                            Is this your first time here? Your username is your University ID and your default password is a
-                            combination of your Last Name, in capital letters, and the last four (4) digits of your University ID number.
+                            Welcome to the International Horizon School Admin Portal. This portal is exclusively for administrators to manage the school system.
                         </p>
 
                         <p className="mb-3">
-                            <strong>Example using University ID:</strong><br />
-                            username: 2013001934<br />
-                            password: LEE1934
+                            <strong>Admin Access:</strong><br />
+                            Use your admin credentials to access the administrative dashboard.
                         </p>
 
                         <p className="mb-3">
-                            <strong>Example using University email:</strong><br />
-                            username: 2013001934@my.ihs.edu.ph<br />
-                            password: LEE1934
+                            <strong>Available Features:</strong><br />
+                            • Dashboard Management<br />
+                            • Faculty Management<br />
+                            • Student Management<br />
+                            • Reports Generation<br />
+                            • System Settings
                         </p>
 
                         <p className="mt-6 text-xs opacity-90">
-                            Access IHS for Graduate degree programs: <a href="https://opisv2025.ihs.edu.ph" className="underline hover:opacity-80" target="_blank" rel="noopener noreferrer">opisv2025.ihs.edu.ph</a>.
+                            For student and faculty login, please use the <a href="/login" className="underline hover:opacity-80">regular login page</a>.
                         </p>
                     </div>
                 </div>
@@ -116,29 +108,29 @@ export default function Login() {
                 <div className="w-full lg:w-1/3 p-6 sm:p-8 xl:p-10 bg-white font-ui">
                     {/* Login Header */}
                     <div className="mb-6">
-                        <h3 className="text-xl sm:text-2xl font-semibold text-gray-800">Already have an account?</h3>
-                        <p className="text-sm text-gray-500 mt-1">Sign in with your University ID or email</p>
+                        <h3 className="text-xl sm:text-2xl font-semibold text-gray-800">Admin Login</h3>
+                        <p className="text-sm text-gray-500 mt-1">Sign in with your admin credentials</p>
                     </div>
 
                     {/* Login Form */}
                     <form method="POST" onSubmit={handleSubmit} className="space-y-4" noValidate>
-                        {/* Email / Admin ID Input */}
+                        {/* Username Input */}
                         <div>
-                            <label className="sr-only" htmlFor="email">Admin ID / Email</label>
+                            <label className="sr-only" htmlFor="username">Username</label>
                             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                                 <img src="/images/admin-icon.png" alt="Admin Icon" className="w-5 h-5 object-contain" />
                                 <input
-                                    id="email"
-                                    name="email"
+                                    id="username"
+                                    name="username"
                                     type="text"
-                                    value={formData.email}
+                                    value={formData.username}
                                     onChange={handleChange}
                                     required
                                     className="w-full bg-transparent outline-none ml-3 text-sm sm:text-base"
-                                    placeholder="Admin ID"
+                                    placeholder="Username"
                                 />
                             </div>
-                            {errors.email && <p className="text-xs text-red-600 mt-1">{errors.email}</p>}
+                            {errors.username && <p className="text-xs text-red-600 mt-1">{errors.username}</p>}
                         </div>
 
                         {/* Password Input */}
@@ -172,7 +164,7 @@ export default function Login() {
                                 />
                                 Remember username
                             </label>
-                            <a href="#" className="text-blue-600 hover:underline">Forgot password?</a>
+                            <a href="/login" className="text-blue-600 hover:underline">Student/Faculty Login</a>
                         </div>
 
                         {/* Submit Button */}
@@ -187,7 +179,7 @@ export default function Login() {
                         </div>
 
                         {/* Error Message */}
-                        {Object.keys(errors).length > 0 && !errors.email && !errors.password && (
+                        {Object.keys(errors).length > 0 && !errors.username && !errors.password && (
                             <div className="text-sm text-red-600">
                                 {Object.values(errors)[0]}
                             </div>
@@ -199,13 +191,12 @@ export default function Login() {
             {/* Mobile Info Card */}
             <div className="lg:hidden max-w-6xl w-full mt-6">
                 <div className="bg-[#243b80] text-white rounded-xl p-6">
-                    <h3 className="text-lg sm:text-xl font-bold mb-3">IHS Admin</h3>
+                    <h3 className="text-lg sm:text-xl font-bold mb-3">Admin Portal</h3>
                     <p className="text-sm sm:text-base mb-3">
-                        Is this your first time here? Your username is your University ID and your default password is a
-                        combination of your Last Name, in capital letters, and the last four (4) digits of your University ID number.
+                        Welcome to the International Horizon School Admin Portal. This portal is exclusively for administrators.
                     </p>
                     <p className="text-sm sm:text-base">
-                        <strong>Example:</strong> username: 2013001934, password: LEE1934
+                        For student and faculty login, please use the <a href="/login" className="underline">regular login page</a>.
                     </p>
                 </div>
             </div>
@@ -263,3 +254,4 @@ export default function Login() {
         </div>
     );
 }
+

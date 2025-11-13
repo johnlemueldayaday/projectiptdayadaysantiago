@@ -12,6 +12,6 @@ use Illuminate\Support\Facades\Route;
 */
 
 // SPA route - serve React app
-Route::get('/{any?}', function () {
+Route::get('/{any}', function () {
     return view('app');
-})->where('any', '.*')->name('welcome');
+})->where('any', '^(?!api).*$')->name('spa');
