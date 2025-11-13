@@ -37,15 +37,15 @@ export default function Register() {
             if (response.data.success) {
                 // Wait a moment for session to be established
                 await new Promise(resolve => setTimeout(resolve, 300));
-                
+
                 // Always redirect to profile on first registration
                 const redirectPath = '/profile';
-                
+
                 // Trigger App.js routing
                 window.dispatchEvent(new CustomEvent('navigate', { detail: { path: redirectPath } }));
                 window.history.pushState({}, '', redirectPath);
                 window.dispatchEvent(new PopStateEvent('popstate'));
-                
+
                 // Fallback
                 setTimeout(() => {
                     if (window.location.pathname !== redirectPath) {
@@ -58,7 +58,7 @@ export default function Register() {
                 // Handle validation errors
                 const errorData = error.response.data.errors;
                 const formattedErrors = {};
-                
+
                 // Format Laravel validation errors
                 Object.keys(errorData).forEach(key => {
                     if (Array.isArray(errorData[key])) {
@@ -67,11 +67,11 @@ export default function Register() {
                         formattedErrors[key] = errorData[key];
                     }
                 });
-                
+
                 setErrors(formattedErrors);
             } else {
-                setErrors({ 
-                    general: error.response?.data?.message || 'Registration failed. Please try again.' 
+                setErrors({
+                    general: error.response?.data?.message || 'Registration failed. Please try again.'
                 });
             }
         } finally {
@@ -124,10 +124,10 @@ export default function Register() {
                             <label className="sr-only" htmlFor="name">Full Name</label>
                             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                                 <img src="/images/admin-icon.png" alt="Name Icon" className="w-5 h-5 object-contain" />
-                                <input 
-                                    id="name" 
-                                    name="name" 
-                                    type="text" 
+                                <input
+                                    id="name"
+                                    name="name"
+                                    type="text"
                                     value={formData.name}
                                     onChange={handleChange}
                                     required
@@ -143,10 +143,10 @@ export default function Register() {
                             <label className="sr-only" htmlFor="email">Email</label>
                             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                                 <img src="/images/admin-icon.png" alt="Email Icon" className="w-5 h-5 object-contain" />
-                                <input 
-                                    id="email" 
-                                    name="email" 
-                                    type="email" 
+                                <input
+                                    id="email"
+                                    name="email"
+                                    type="email"
                                     value={formData.email}
                                     onChange={handleChange}
                                     required
@@ -162,10 +162,10 @@ export default function Register() {
                             <label className="sr-only" htmlFor="password">Password</label>
                             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                                 <img src="/images/password-icon.png" alt="Password Icon" className="w-5 h-5 object-contain" />
-                                <input 
-                                    id="password" 
-                                    name="password" 
-                                    type="password" 
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type="password"
                                     value={formData.password}
                                     onChange={handleChange}
                                     required
@@ -181,9 +181,9 @@ export default function Register() {
                             <label className="block text-sm font-medium text-gray-700 mb-2">I am a:</label>
                             <div className="flex gap-4">
                                 <label className="flex items-center gap-2 cursor-pointer">
-                                    <input 
-                                        type="radio" 
-                                        name="role" 
+                                    <input
+                                        type="radio"
+                                        name="role"
                                         value="student"
                                         checked={formData.role === 'student'}
                                         onChange={handleChange}
@@ -192,9 +192,9 @@ export default function Register() {
                                     <span className="text-sm text-gray-700">Student</span>
                                 </label>
                                 <label className="flex items-center gap-2 cursor-pointer">
-                                    <input 
-                                        type="radio" 
-                                        name="role" 
+                                    <input
+                                        type="radio"
+                                        name="role"
                                         value="faculty"
                                         checked={formData.role === 'faculty'}
                                         onChange={handleChange}
@@ -208,8 +208,8 @@ export default function Register() {
 
                         {/* Submit */}
                         <div>
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={loading}
                                 className="w-full py-3 bg-[#243b80] text-white font-semibold rounded-md hover:opacity-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >

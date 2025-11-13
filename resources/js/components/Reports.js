@@ -14,66 +14,27 @@ export default function Reports() {
     const [filters, setFilters] = useState({
         department: '',
         year: '',
-        role: ''
+        role: '',
+        course: ''
     });
-
+    const [courses, setCourses] = useState([]);
+    const [departments, setDepartments] = useState([]);
     const reportTypes = [
         {
             id: 'student-enrollment',
-            title: 'Student Enrollment Report',
-            description: 'Comprehensive report of all enrolled students by department and year level',
+            title: 'Student Report',
+            description: 'Generate reports filtered by course for students',
             icon: '📊',
             category: 'Students'
         },
         {
             id: 'faculty-assignment',
-            title: 'Faculty Assignment Report',
-            description: 'Faculty members and their teaching department assignments',
+            title: 'Faculty Report',
+            description: 'Generate reports filtered by department for faculty',
             icon: '👨‍🏫',
             category: 'Faculty'
         },
-        {
-            id: 'department-statistics',
-            title: 'Department Statistics',
-            description: 'Statistical breakdown of students and faculty by department',
-            icon: '📈',
-            category: 'Statistics'
-        },
-        {
-            id: 'year-level-distribution',
-            title: 'Year Level Distribution',
-            description: 'Distribution of students across different year levels',
-            icon: '🎓',
-            category: 'Students'
-        },
-        {
-            id: 'enrollment-trends',
-            title: 'Enrollment Trends',
-            description: 'Historical enrollment data and trends over time',
-            icon: '📉',
-            category: 'Analytics'
-        },
-        {
-            id: 'faculty-mastery',
-            title: 'Faculty Expertise Report',
-            description: 'Faculty members and their areas of mastery/expertise',
-            icon: '🔬',
-            category: 'Faculty'
-        },
-        {
-            id: 'complete-directory',
-            title: 'Complete Directory',
-            description: 'Complete directory of all students and faculty members',
-            icon: '📋',
-            category: 'Directory'
-        },
-        {
-            id: 'contact-information',
-            title: 'Contact Information Report',
-            description: 'Contact details for all registered students and faculty',
-            icon: '📞',
-            category: 'Directory'
-        }
+
     ];
 
     useEffect(() => {
@@ -137,34 +98,44 @@ export default function Reports() {
 
             // Fetch actual data based on report type
             let data = null;
-            
+
             if (reportId === 'student-enrollment') {
+                // Students filtered by course
+                const params = {};
+                if (filters.course) params.course = filters.course;
+                if (filters.year) params.year = filters.year;
+
                 const response = await axios.get('/api/students', {
-                    params: filters.department ? { department: filters.department } : {},
+                    params: params,
                     withCredentials: true
                 });
                 data = {
                     type: 'student-enrollment',
                     title: 'Student Enrollment Report',
                     generatedAt: new Date().toISOString(),
-                    filters: filters,
+                    filters: { course: filters.course, year: filters.year },
                     data: response.data || [],
                     summary: {
                         total: response.data?.length || 0,
-                        byDepartment: groupByDepartment(response.data || []),
-                        byYear: groupByYear(response.data || [])
+                        byCourse: groupByCourse(response.data || []),
+                        byYear: groupByYear(response.data || []),
+                        byDepartment: groupByDepartment(response.data || [])
                     }
                 };
             } else if (reportId === 'faculty-assignment') {
+                // Faculty filtered by department
+                const params = {};
+                if (filters.department) params.department = filters.department;
+
                 const response = await axios.get('/api/faculty', {
-                    params: filters.department ? { department: filters.department } : {},
+                    params: params,
                     withCredentials: true
                 });
                 data = {
                     type: 'faculty-assignment',
                     title: 'Faculty Assignment Report',
                     generatedAt: new Date().toISOString(),
-                    filters: filters,
+                    filters: { department: filters.department },
                     data: response.data || [],
                     summary: {
                         total: response.data?.length || 0,
@@ -215,6 +186,15 @@ export default function Reports() {
         } finally {
             setGenerating(false);
         }
+    };
+
+    const groupByCourse = (students) => {
+        const grouped = {};
+        students.forEach(student => {
+            const course = student.course || 'Unknown';
+            grouped[course] = (grouped[course] || 0) + 1;
+        });
+        return grouped;
     };
 
     const groupByDepartment = (students) => {
@@ -334,8 +314,7 @@ export default function Reports() {
                             <a href="/faculty" className="text-gray-800 hover:text-blue-600 transition">Faculty</a>
                             <a href="/students" className="text-gray-800 hover:text-blue-600 transition">Students</a>
                             <a href="/reports" className="text-gray-800 hover:text-blue-600 transition font-semibold">Reports</a>
-                            <a href="/settings" className="text-gray-800 hover:text-blue-600 transition">Settings</a>
-                            <a href="/profile" className="text-gray-800 hover:text-blue-600 transition">Profile</a>
+                            <a href="/settings" className="text-gray-800 hover:text-blue-600 transition">System Settings</a>
                         </div>
                         <div>
                             <form onSubmit={handleLogout}>
@@ -384,42 +363,76 @@ export default function Reports() {
                         <div className="lg:col-span-1">
                             <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 sticky top-24">
                                 <h2 className="text-xl font-semibold text-gray-800 mb-4">Report Types</h2>
-                                
+
                                 {/* Filters */}
                                 <div className="mb-4 space-y-3">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-                                        <select
-                                            value={filters.department}
-                                            onChange={(e) => setFilters({...filters, department: e.target.value})}
-                                            className="w-full border rounded-md p-2 bg-white text-sm"
-                                        >
-                                            <option value="">All Departments</option>
-                                            <option value="Computer Studies">Computer Studies</option>
-                                            <option value="Engineering">Engineering</option>
-                                            <option value="Accountancy">Accountancy</option>
-                                            <option value="Business Ad">Business Ad</option>
-                                            <option value="Nursing">Nursing</option>
-                                            <option value="Teachers Education">Teachers Education</option>
-                                            <option value="Tourism and Hospitality Management">Tourism and Hospitality Management</option>
-                                            <option value="Arts and Sciences">Arts and Sciences</option>
-                                            <option value="Criminal Justice Education">Criminal Justice Education</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Year Level</label>
-                                        <select
-                                            value={filters.year}
-                                            onChange={(e) => setFilters({...filters, year: e.target.value})}
-                                            className="w-full border rounded-md p-2 bg-white text-sm"
-                                        >
-                                            <option value="">All Years</option>
-                                            <option value="1">Year 1</option>
-                                            <option value="2">Year 2</option>
-                                            <option value="3">Year 3</option>
-                                            <option value="4">Year 4</option>
-                                        </select>
-                                    </div>
+                                    {/* Show course filter for student reports */}
+                                    {selectedReport?.id === 'student-enrollment' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Course</label>
+                                            <select
+                                                value={filters.course}
+                                                onChange={(e) => setFilters({...filters, course: e.target.value})}
+                                                className="w-full border rounded-md p-2 bg-white text-sm"
+                                            >
+                                                <option value="">All Courses</option>
+                                                <option value="BSCS">BSCS - Computer Science</option>
+                                                <option value="BSIT">BSIT - Information Technology</option>
+                                                <option value="BSCE">BSCE - Civil Engineering</option>
+                                                <option value="BSEE">BSEE - Electrical Engineering</option>
+                                                <option value="BSME">BSME - Mechanical Engineering</option>
+                                                <option value="BSA">BSA - Accountancy</option>
+                                                <option value="BSBA">BSBA - Business Administration</option>
+                                                <option value="BSN">BSN - Nursing</option>
+                                                <option value="BEED">BEED - Elementary Education</option>
+                                                <option value="BSED">BSED - Secondary Education</option>
+                                                <option value="BSTM">BSTM - Tourism Management</option>
+                                                <option value="BSHM">BSHM - Hospitality Management</option>
+                                                <option value="BSCrim">BSCrim - Criminology</option>
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Show department filter for faculty reports */}
+                                    {selectedReport?.id === 'faculty-assignment' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                                            <select
+                                                value={filters.department}
+                                                onChange={(e) => setFilters({...filters, department: e.target.value})}
+                                                className="w-full border rounded-md p-2 bg-white text-sm"
+                                            >
+                                                <option value="">All Departments</option>
+                                                <option value="Computer Studies">Computer Studies</option>
+                                                <option value="Engineering">Engineering</option>
+                                                <option value="Accountancy">Accountancy</option>
+                                                <option value="Business Ad">Business Ad</option>
+                                                <option value="Nursing">Nursing</option>
+                                                <option value="Teachers Education">Teachers Education</option>
+                                                <option value="Tourism and Hospitality Management">Tourism and Hospitality Management</option>
+                                                <option value="Arts and Sciences">Arts and Sciences</option>
+                                                <option value="Criminal Justice Education">Criminal Justice Education</option>
+                                            </select>
+                                        </div>
+                                    )}
+
+                                    {/* Year filter only for student reports */}
+                                    {selectedReport?.id === 'student-enrollment' && (
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Year Level</label>
+                                            <select
+                                                value={filters.year}
+                                                onChange={(e) => setFilters({...filters, year: e.target.value})}
+                                                className="w-full border rounded-md p-2 bg-white text-sm"
+                                            >
+                                                <option value="">All Years</option>
+                                                <option value="1">Year 1</option>
+                                                <option value="2">Year 2</option>
+                                                <option value="3">Year 3</option>
+                                                <option value="4">Year 4</option>
+                                            </select>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="space-y-2 max-h-[600px] overflow-y-auto">
@@ -468,6 +481,26 @@ export default function Reports() {
                                                 <p className="text-sm text-gray-500 mt-1">
                                                     Generated on {formatReportDate(reportData.generatedAt)}
                                                 </p>
+                                                {/* Show active filters */}
+                                                {reportData.filters && (
+                                                    <div className="mt-2 flex flex-wrap gap-2">
+                                                        {reportData.filters.course && (
+                                                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                                                Course: {reportData.filters.course}
+                                                            </span>
+                                                        )}
+                                                        {reportData.filters.department && (
+                                                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
+                                                                Department: {reportData.filters.department}
+                                                            </span>
+                                                        )}
+                                                        {reportData.filters.year && (
+                                                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">
+                                                                Year: {reportData.filters.year}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                             <div className="text-right">
                                                 <p className="text-sm text-gray-600">Report ID</p>
@@ -498,14 +531,37 @@ export default function Reports() {
                                                             <p className="text-2xl font-bold text-blue-600">{reportData.summary.total}</p>
                                                         </div>
                                                     )}
-                                                    {reportData.summary.byDepartment && Object.keys(reportData.summary.byDepartment).length > 0 && (
+                                                    {reportData.summary.byCourse && Object.keys(reportData.summary.byCourse).length > 0 && (
                                                         <div className="bg-green-50 p-4 rounded-lg">
-                                                            <p className="text-sm text-gray-600">Departments</p>
+                                                            <p className="text-sm text-gray-600">Courses</p>
                                                             <p className="text-2xl font-bold text-green-600">
+                                                                {Object.keys(reportData.summary.byCourse).length}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                    {reportData.summary.byDepartment && Object.keys(reportData.summary.byDepartment).length > 0 && (
+                                                        <div className="bg-purple-50 p-4 rounded-lg">
+                                                            <p className="text-sm text-gray-600">Departments</p>
+                                                            <p className="text-2xl font-bold text-purple-600">
                                                                 {Object.keys(reportData.summary.byDepartment).length}
                                                             </p>
                                                         </div>
                                                     )}
+                                                </div>
+                                            )}
+
+                                            {/* Course Breakdown (for student reports) */}
+                                            {reportData.summary?.byCourse && (
+                                                <div>
+                                                    <h3 className="text-lg font-semibold text-gray-800 mb-3">By Course</h3>
+                                                    <div className="space-y-2">
+                                                        {Object.entries(reportData.summary.byCourse).map(([course, count]) => (
+                                                            <div key={course} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                                                <span className="text-gray-700">{course}</span>
+                                                                <span className="font-semibold text-blue-600">{count}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -566,6 +622,9 @@ export default function Reports() {
                                                                 <tr>
                                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
                                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID Number</th>
+                                                                    {reportData.type === 'student-enrollment' && (
+                                                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Course</th>
+                                                                    )}
                                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                                                                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
                                                                 </tr>
@@ -579,6 +638,11 @@ export default function Reports() {
                                                                         <td className="px-4 py-3 text-sm text-gray-600">
                                                                             {item.id_number || 'N/A'}
                                                                         </td>
+                                                                        {reportData.type === 'student-enrollment' && (
+                                                                            <td className="px-4 py-3 text-sm text-gray-600">
+                                                                                {item.course || 'N/A'}
+                                                                            </td>
+                                                                        )}
                                                                         <td className="px-4 py-3 text-sm text-gray-600">
                                                                             {item.department || item.teaching_department || 'N/A'}
                                                                         </td>

@@ -38,18 +38,18 @@ export default function Login() {
             if (response.data.success) {
                 // Wait a moment for session to be established
                 await new Promise(resolve => setTimeout(resolve, 300));
-                
+
                 // Check if profile needs to be completed
                 const needsProfile = response.data.needsProfile;
                 const redirectPath = needsProfile ? '/profile' : '/home';
-                
+
                 // Trigger App.js routing by updating the path
                 window.dispatchEvent(new CustomEvent('navigate', { detail: { path: redirectPath } }));
-                
+
                 // Also update the URL and trigger popstate
                 window.history.pushState({}, '', redirectPath);
                 window.dispatchEvent(new PopStateEvent('popstate'));
-                
+
                 // Fallback: use full reload if client-side navigation doesn't work
                 setTimeout(() => {
                     if (window.location.pathname !== redirectPath) {
@@ -119,10 +119,10 @@ export default function Login() {
                             <label className="sr-only" htmlFor="email">Admin ID / Email</label>
                             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                                 <img src="/images/admin-icon.png" alt="Admin Icon" className="w-5 h-5 object-contain" />
-                                <input 
-                                    id="email" 
-                                    name="email" 
-                                    type="text" 
+                                <input
+                                    id="email"
+                                    name="email"
+                                    type="text"
                                     value={formData.email}
                                     onChange={handleChange}
                                     required
@@ -138,10 +138,10 @@ export default function Login() {
                             <label className="sr-only" htmlFor="password">Password</label>
                             <div className="flex items-center bg-gray-50 border border-gray-200 rounded-md px-3 py-2">
                                 <img src="/images/password-icon.png" alt="Password Icon" className="w-5 h-5 object-contain" />
-                                <input 
-                                    id="password" 
-                                    name="password" 
-                                    type="password" 
+                                <input
+                                    id="password"
+                                    name="password"
+                                    type="password"
                                     value={formData.password}
                                     onChange={handleChange}
                                     required
@@ -155,9 +155,9 @@ export default function Login() {
                         {/* Options Row */}
                         <div className="flex items-center justify-between text-sm">
                             <label className="inline-flex items-center gap-2 text-gray-600">
-                                <input 
-                                    type="checkbox" 
-                                    name="remember" 
+                                <input
+                                    type="checkbox"
+                                    name="remember"
                                     checked={formData.remember}
                                     onChange={handleChange}
                                     className="form-checkbox h-4 w-4 text-blue-600 rounded"
@@ -169,8 +169,8 @@ export default function Login() {
 
                         {/* Submit Button */}
                         <div>
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={loading}
                                 className="w-full py-3 bg-[#243b80] text-white font-semibold rounded-md hover:opacity-95 transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >

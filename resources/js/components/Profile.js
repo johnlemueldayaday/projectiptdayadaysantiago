@@ -10,19 +10,8 @@ export default function Profile() {
     const [errors, setErrors] = useState({});
     const [profilePicture, setProfilePicture] = useState(null);
     const [profilePicturePreview, setProfilePicturePreview] = useState(null);
-
-    // Department options - same as Students.js
-    const departments = [
-        'Computer Studies',
-        'Engineering',
-        'Accountancy',
-        'Business Ad',
-        'Nursing',
-        'Teachers Education',
-        'Tourism and Hospitality Management',
-        'Arts and Sciences',
-        'Criminal Justice Education'
-    ];
+    const [courses, setCourses] = useState([]);
+    const [departments, setDepartments] = useState([]);
 
     // Year options
     const years = ['1', '2', '3', '4'];
@@ -44,10 +33,8 @@ export default function Profile() {
         year: '',
         department: '',
         // Faculty fields
-        graduated_school: '',
         year_graduated: '',
         years_teaching: '',
-        mastery: '',
         teaching_department: ''
     });
 
@@ -72,6 +59,7 @@ export default function Profile() {
     useEffect(() => {
         fetchUser();
         fetchProfile();
+        fetchCoursesAndDepartments();
     }, []);
 
     const fetchUser = async (retryCount = 0) => {
@@ -144,10 +132,8 @@ export default function Profile() {
                     year: response.data.year || '',
                     department: response.data.department || '',
                     // Faculty fields
-                    graduated_school: response.data.graduated_school || '',
                     year_graduated: response.data.year_graduated || '',
                     years_teaching: response.data.years_teaching || '',
-                    mastery: response.data.mastery || '',
                     teaching_department: response.data.teaching_department || ''
                 });
                 // Use profile_picture_url if available, otherwise construct from profile_picture path
@@ -164,6 +150,20 @@ export default function Profile() {
             }
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchCoursesAndDepartments = async () => {
+        try {
+            const [coursesRes, deptsRes] = await Promise.all([
+                axios.get('/api/settings/courses/dropdown', { withCredentials: true }),
+                axios.get('/api/settings/departments/dropdown', { withCredentials: true })
+            ]);
+
+            setCourses(coursesRes.data || []);
+            setDepartments(deptsRes.data || []);
+        } catch (error) {
+            console.error('Error fetching courses/departments:', error);
         }
     };
 
@@ -189,7 +189,7 @@ export default function Profile() {
             // Validate file type
             const validTypes = ['image/png', 'image/jpeg', 'image/jpg'];
             const fileType = file.type.toLowerCase();
-            
+
             if (!validTypes.includes(fileType)) {
                 setErrors({ profile_picture: 'Please upload a PNG or JPEG image file.' });
                 e.target.value = ''; // Clear the input
@@ -231,7 +231,7 @@ export default function Profile() {
 
         try {
             const formDataToSend = new FormData();
-            
+
             // Append all form fields (send empty strings for empty fields)
             Object.keys(formData).forEach(key => {
                 formDataToSend.append(key, formData[key] || '');
@@ -250,17 +250,17 @@ export default function Profile() {
             // Get CSRF token from meta tag or axios defaults
             const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
             const token = csrfToken || window.axios?.defaults?.headers?.common?.['X-CSRF-TOKEN'] || '';
-            
+
             // Don't set Content-Type for FormData - let browser set it with boundary
             const headers = {
                 'X-Requested-With': 'XMLHttpRequest'
             };
-            
+
             // Only add CSRF token if it exists (though api/* routes are excluded)
             if (token) {
                 headers['X-CSRF-TOKEN'] = token;
             }
-            
+
             const response = await axios.post('/api/profile', formDataToSend, {
                 headers: headers,
                 withCredentials: true
@@ -276,7 +276,7 @@ export default function Profile() {
                     setProfilePicturePreview(`/storage/${response.data.profile.profile_picture}`);
                 }
                 setProfilePicture(null);
-                
+
                 // Clear success message after 5 seconds
                 setTimeout(() => setSuccess(''), 5000);
             }
@@ -284,16 +284,16 @@ export default function Profile() {
             console.error('Profile update error:', error);
             console.error('Error response:', error.response);
             console.error('Error data:', error.response?.data);
-            
+
             if (error.response) {
                 const status = error.response.status;
                 const errorData = error.response.data;
-                
+
                 if (status === 401 || status === 403) {
                     // Check if it's a real authentication error or just a session issue
                     const errorMessage = errorData?.message || errorData?.error || 'Your session has expired. Please log in again.';
                     setErrors({ general: errorMessage });
-                    
+
                     // Only redirect if it's a confirmed authentication error
                     // Give user a chance to see the error first
                     setTimeout(() => {
@@ -384,8 +384,8 @@ export default function Profile() {
                             <a href="/faculty" className="text-gray-800 hover:text-blue-600">Faculty</a>
                             <a href="/students" className="text-gray-800 hover:text-blue-600">Students</a>
                             <a href="/reports" className="text-gray-800 hover:text-blue-600">Reports</a>
-                            <a href="/settings" className="text-gray-800 hover:text-blue-600">Settings</a>
-                            <a href="/profile" className="text-gray-800 hover:text-blue-600">Profile</a>
+                            <a href="/settings" className="text-gray-800 hover:text-blue-600">System Settings</a>
+
                         </div>
                         <div>
                             <form onSubmit={handleLogout}>
@@ -414,9 +414,9 @@ export default function Profile() {
                     <form onSubmit={handleSubmit} className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 space-y-4">
                         {/* Profile Picture */}
                         <div className="flex items-center gap-4 mb-6">
-                            <img 
-                                src={profilePicturePreview || '/images/default-avatar.png'} 
-                                alt="Profile" 
+                            <img
+                                src={profilePicturePreview || '/images/default-avatar.png'}
+                                alt="Profile"
                                 className="h-20 w-20 rounded-full object-cover border"
                                 onError={(e) => {
                                     e.target.src = '/images/default-avatar.png';
@@ -424,9 +424,9 @@ export default function Profile() {
                             />
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Change Profile Picture</label>
-                                <input 
-                                    type="file" 
-                                    name="profile_picture" 
+                                <input
+                                    type="file"
+                                    name="profile_picture"
                                     accept="image/png,image/jpeg,image/jpg"
                                     onChange={handleFileChange}
                                     className="mt-1 block w-full text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
@@ -442,9 +442,9 @@ export default function Profile() {
                         <div className="grid sm:grid-cols-3 gap-4">
                             <div>
                                 <label className="block text-sm font-medium">First Name</label>
-                                <input 
-                                    type="text" 
-                                    name="first_name" 
+                                <input
+                                    type="text"
+                                    name="first_name"
                                     value={formData.first_name}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2"
@@ -453,9 +453,9 @@ export default function Profile() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium">Middle Name</label>
-                                <input 
-                                    type="text" 
-                                    name="middle_name" 
+                                <input
+                                    type="text"
+                                    name="middle_name"
                                     value={formData.middle_name}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2"
@@ -464,9 +464,9 @@ export default function Profile() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium">Last Name</label>
-                                <input 
-                                    type="text" 
-                                    name="last_name" 
+                                <input
+                                    type="text"
+                                    name="last_name"
                                     value={formData.last_name}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2"
@@ -479,8 +479,8 @@ export default function Profile() {
                         <div className="grid sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium">Sex</label>
-                                <select 
-                                    name="sex" 
+                                <select
+                                    name="sex"
                                     value={formData.sex}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2"
@@ -492,9 +492,9 @@ export default function Profile() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium">Nationality</label>
-                                <input 
-                                    type="text" 
-                                    name="nationality" 
+                                <input
+                                    type="text"
+                                    name="nationality"
                                     value={formData.nationality}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2"
@@ -506,9 +506,9 @@ export default function Profile() {
                         <div className="grid sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium">ID Number</label>
-                                <input 
-                                    type="text" 
-                                    name="id_number" 
+                                <input
+                                    type="text"
+                                    name="id_number"
                                     value={formData.id_number}
                                     readOnly
                                     className="mt-1 w-full border rounded-md p-2 bg-gray-100 cursor-not-allowed"
@@ -519,9 +519,9 @@ export default function Profile() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium">Contact Number</label>
-                                <input 
-                                    type="text" 
-                                    name="contact_number" 
+                                <input
+                                    type="text"
+                                    name="contact_number"
                                     value={formData.contact_number}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2"
@@ -532,9 +532,9 @@ export default function Profile() {
 
                         <div>
                             <label className="block text-sm font-medium">Address</label>
-                            <input 
-                                type="text" 
-                                name="address" 
+                            <input
+                                type="text"
+                                name="address"
                                 value={formData.address}
                                 onChange={handleChange}
                                 className="mt-1 w-full border rounded-md p-2"
@@ -545,8 +545,8 @@ export default function Profile() {
                         <div className="grid sm:grid-cols-2 gap-4">
                             <div>
                                 <label className="block text-sm font-medium">Religion</label>
-                                <select 
-                                    name="religion" 
+                                <select
+                                    name="religion"
                                     value={formData.religion}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2 bg-white"
@@ -562,8 +562,8 @@ export default function Profile() {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium">Civil Status</label>
-                                <select 
-                                    name="civil_status" 
+                                <select
+                                    name="civil_status"
                                     value={formData.civil_status}
                                     onChange={handleChange}
                                     className="mt-1 w-full border rounded-md p-2 bg-white"
@@ -581,9 +581,9 @@ export default function Profile() {
 
                         <div>
                             <label className="block text-sm font-medium">Email</label>
-                            <input 
-                                type="email" 
-                                name="email" 
+                            <input
+                                type="email"
+                                name="email"
                                 value={formData.email}
                                 onChange={handleChange}
                                 className="mt-1 w-full border rounded-md p-2"
@@ -593,9 +593,9 @@ export default function Profile() {
 
                         <div>
                             <label className="block text-sm font-medium">Birthday</label>
-                            <input 
-                                type="date" 
-                                name="birthday" 
+                            <input
+                                type="date"
+                                name="birthday"
                                 value={formData.birthday}
                                 onChange={handleChange}
                                 className="mt-1 w-full border rounded-md p-2"
@@ -608,22 +608,10 @@ export default function Profile() {
                             <>
                                 <div className="grid sm:grid-cols-2 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium">Graduated School</label>
-                                        <input 
-                                            type="text" 
-                                            name="graduated_school" 
-                                            value={formData.graduated_school}
-                                            onChange={handleChange}
-                                            placeholder="Name of school/university"
-                                            className="mt-1 w-full border rounded-md p-2"
-                                        />
-                                        {errors.graduated_school && <p className="text-xs text-red-600 mt-1">{errors.graduated_school}</p>}
-                                    </div>
-                                    <div>
                                         <label className="block text-sm font-medium">Year Graduated</label>
-                                        <input 
-                                            type="text" 
-                                            name="year_graduated" 
+                                        <input
+                                            type="text"
+                                            name="year_graduated"
                                             value={formData.year_graduated}
                                             onChange={handleChange}
                                             placeholder="e.g., 2010"
@@ -631,14 +619,11 @@ export default function Profile() {
                                         />
                                         {errors.year_graduated && <p className="text-xs text-red-600 mt-1">{errors.year_graduated}</p>}
                                     </div>
-                                </div>
-
-                                <div className="grid sm:grid-cols-2 gap-4">
                                     <div>
                                         <label className="block text-sm font-medium">Years of Teaching</label>
-                                        <input 
-                                            type="number" 
-                                            name="years_teaching" 
+                                        <input
+                                            type="number"
+                                            name="years_teaching"
                                             value={formData.years_teaching}
                                             onChange={handleChange}
                                             placeholder="Number of years"
@@ -647,56 +632,48 @@ export default function Profile() {
                                         />
                                         {errors.years_teaching && <p className="text-xs text-red-600 mt-1">{errors.years_teaching}</p>}
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium">Teaching Department</label>
-                                        <select 
-                                            name="teaching_department" 
-                                            value={formData.teaching_department}
-                                            onChange={handleChange}
-                                            className="mt-1 w-full border rounded-md p-2 bg-white"
-                                        >
-                                            <option value="">Select Department</option>
-                                            {departments.map((dept) => (
-                                                <option key={dept} value={dept}>
-                                                    {dept}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {errors.teaching_department && <p className="text-xs text-red-600 mt-1">{errors.teaching_department}</p>}
-                                    </div>
                                 </div>
 
                                 <div>
-                                    <label className="block text-sm font-medium">Mastery (Subjects/Areas of Expertise)</label>
-                                    <input 
-                                        type="text" 
-                                        name="mastery" 
-                                        value={formData.mastery}
+                                    <label className="block text-sm font-medium">Teaching Department</label>
+                                    <select
+                                        name="teaching_department"
+                                        value={formData.teaching_department}
                                         onChange={handleChange}
-                                        placeholder="e.g., Mathematics, Computer Science, etc."
-                                        className="mt-1 w-full border rounded-md p-2"
-                                    />
-                                    {errors.mastery && <p className="text-xs text-red-600 mt-1">{errors.mastery}</p>}
+                                        className="mt-1 w-full border rounded-md p-2 bg-white"
+                                    >
+                                        <option value="">Select Department</option>
+                                        {departments.map((dept) => (
+                                            <option key={dept.id} value={dept.name}>{dept.name}</option>
+                                        ))}
+                                    </select>
+                                    {errors.teaching_department && <p className="text-xs text-red-600 mt-1">{errors.teaching_department}</p>}
                                 </div>
                             </>
                         ) : (
                             <div className="grid sm:grid-cols-3 gap-4">
                                 <div>
                                     <label className="block text-sm font-medium">Course</label>
-                                    <input 
-                                        type="text" 
-                                        name="course" 
+                                    <input
+                                        type="text"
+                                        name="course"
                                         value={formData.course}
                                         onChange={handleChange}
                                         placeholder="e.g., BSIT, BSCS, etc."
                                         className="mt-1 w-full border rounded-md p-2"
+                                        list="course-list"
                                     />
+                                    <datalist id="course-list">
+                                        {courses.map(course => (
+                                            <option key={course.id} value={course.code}>{course.name}</option>
+                                        ))}
+                                    </datalist>
                                     {errors.course && <p className="text-xs text-red-600 mt-1">{errors.course}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium">Year</label>
-                                    <select 
-                                        name="year" 
+                                    <select
+                                        name="year"
                                         value={formData.year}
                                         onChange={handleChange}
                                         className="mt-1 w-full border rounded-md p-2 bg-white"
@@ -712,17 +689,15 @@ export default function Profile() {
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium">Department</label>
-                                    <select 
-                                        name="department" 
+                                    <select
+                                        name="department"
                                         value={formData.department}
                                         onChange={handleChange}
                                         className="mt-1 w-full border rounded-md p-2 bg-white"
                                     >
                                         <option value="">Select Department</option>
                                         {departments.map((dept) => (
-                                            <option key={dept} value={dept}>
-                                                {dept}
-                                            </option>
+                                            <option key={dept.id} value={dept.name}>{dept.name}</option>
                                         ))}
                                     </select>
                                     {errors.department && <p className="text-xs text-red-600 mt-1">{errors.department}</p>}
@@ -731,8 +706,8 @@ export default function Profile() {
                         )}
 
                         <div className="mt-6">
-                            <button 
-                                type="submit" 
+                            <button
+                                type="submit"
                                 disabled={saving}
                                 className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                             >

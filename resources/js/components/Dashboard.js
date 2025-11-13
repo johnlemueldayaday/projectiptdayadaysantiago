@@ -13,7 +13,7 @@ function PieChart({ data, title, colors }) {
 
     const total = Object.values(data).reduce((sum, val) => sum + val, 0);
     const entries = Object.entries(data);
-    
+
     let currentAngle = -90; // Start from top
     const radius = 80;
     const centerX = 120;
@@ -22,26 +22,26 @@ function PieChart({ data, title, colors }) {
     const paths = entries.map(([label, value], index) => {
         const percentage = (value / total) * 100;
         const angle = (value / total) * 360;
-        
+
         const startAngle = currentAngle;
         const endAngle = currentAngle + angle;
-        
+
         const x1 = centerX + radius * Math.cos((startAngle * Math.PI) / 180);
         const y1 = centerY + radius * Math.sin((startAngle * Math.PI) / 180);
         const x2 = centerX + radius * Math.cos((endAngle * Math.PI) / 180);
         const y2 = centerY + radius * Math.sin((endAngle * Math.PI) / 180);
-        
+
         const largeArcFlag = angle > 180 ? 1 : 0;
-        
+
         const pathData = [
             `M ${centerX} ${centerY}`,
             `L ${x1} ${y1}`,
             `A ${radius} ${radius} 0 ${largeArcFlag} 1 ${x2} ${y2}`,
             'Z'
         ].join(' ');
-        
+
         currentAngle = endAngle;
-        
+
         return {
             path: pathData,
             label,
@@ -234,12 +234,11 @@ export default function Dashboard() {
                         </div>
                         {/* Navigation */}
                         <div className="hidden md:flex gap-10 text-lg font-medium">
-                            <a href="/dashboard" className="text-gray-800 hover:text-blue-600 transition">Dashboard</a>
-                            <a href="/faculty" className="text-gray-800 hover:text-blue-600 transition">Faculty</a>
-                            <a href="/students" className="text-gray-800 hover:text-blue-600 transition">Students</a>
-                            <a href="/reports" className="text-gray-800 hover:text-blue-600 transition">Reports</a>
-                            <a href="/settings" className="text-gray-800 hover:text-blue-600 transition">Settings</a>
-                            <a href="/profile" className="text-gray-800 hover:text-blue-600 transition">Profile</a>
+                            <a href="/dashboard" className="text-gray-800 hover:text-blue-600">Dashboard</a>
+                            <a href="/faculty" className="text-gray-800 hover:text-blue-600">Faculty</a>
+                            <a href="/students" className="text-gray-800 hover:text-blue-600">Students</a>
+                            <a href="/reports" className="text-gray-800 hover:text-blue-600">Reports</a>
+                            <a href="/settings" className="text-gray-800 hover:text-blue-600">System Settings</a>
                         </div>
                         <div>
                             <form onSubmit={handleLogout}>
@@ -344,56 +343,6 @@ export default function Dashboard() {
                         </div>
                     )}
 
-                    {/* Quick Actions */}
-                    <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Faculty</h2>
-                            <p className="text-sm text-gray-500 mb-4">Manage faculty records, assignments, and schedules.</p>
-                            <a href="/faculty" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Faculty
-                            </a>
-                        </div>
-
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Students</h2>
-                            <p className="text-sm text-gray-500 mb-4">View, enroll, and update student information.</p>
-                            <a href="/students" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Students
-                            </a>
-                        </div>
-
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Reports</h2>
-                            <p className="text-sm text-gray-500 mb-4">Generate academic and administrative reports.</p>
-                            <a href="/reports" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Reports
-                            </a>
-                        </div>
-
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Registrar Tools</h2>
-                            <p className="text-sm text-gray-500 mb-4">Access core registrar management functions.</p>
-                            <a href="/dashboard" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Open Tools
-                            </a>
-                        </div>
-
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Settings</h2>
-                            <p className="text-sm text-gray-500 mb-4">Update portal configurations and preferences.</p>
-                            <a href="/settings" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Settings
-                            </a>
-                        </div>
-
-                        <div className="bg-white/95 backdrop-blur-sm p-6 rounded-xl shadow-md border border-gray-200 hover:shadow-lg transition cursor-pointer">
-                            <h2 className="text-xl font-semibold text-gray-700 mb-2">Profile</h2>
-                            <p className="text-sm text-gray-500 mb-4">Manage your account and profile details.</p>
-                            <a href="/profile" className="inline-block text-sm px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
-                                Go to Profile
-                            </a>
-                        </div>
-                    </div>
                 </div>
             </main>
 
