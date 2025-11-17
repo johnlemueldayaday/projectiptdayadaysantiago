@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 export default function Students() {
     const [user, setUser] = useState(null);
     const [students, setStudents] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isSearching, setIsSearching] = useState(false);
+    const fetchCancelSource = useRef(null);
+    const latestRequestId = useRef(0);
     const [selectedDepartment, setSelectedDepartment] = useState('');
     const [selectedCourse, setSelectedCourse] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -30,6 +33,7 @@ export default function Students() {
         year: '',
         department: ''
     });
+    const [formErrors, setFormErrors] = useState({});
     const [courses, setCourses] = useState([]);
     const [departments, setDepartments] = useState([]);
 
@@ -42,6 +46,18 @@ export default function Students() {
     useEffect(() => {
         fetchStudents();
     }, [selectedDepartment, selectedCourse, showArchived]);
+
+    // Debounced server-side search: when searchQuery changes, refetch students using server filtering
+    useEffect(() => {
+        const delay = 350; // ms
+        const handler = setTimeout(() => {
+            // If searchQuery is empty, still fetch to reset results
+            // pass true to make this a "silent" fetch that doesn't toggle the global loading spinner
+            fetchStudents(true);
+        }, delay);
+
+        return () => clearTimeout(handler);
+    }, [searchQuery]);
 
     const fetchUser = async (retryCount = 0) => {
         const maxRetries = 2;
@@ -90,25 +106,79 @@ export default function Students() {
     };
 
     const fetchStudents = async () => {
+        let requestId;
         try {
-            setLoading(true);
+            // When called as a "silent" fetch (e.g. during typing), avoid toggling global loading
+            // We'll use a small isSearching state instead for subtle UI feedback.
+            const args = Array.from(arguments);
+            const silent = args[0] === true; // fetchStudents(true) -> silent
+
+            if (!silent) {
+                setLoading(true);
+            } else {
+                setIsSearching(true);
+            }
+
             const params = {};
             if (selectedDepartment) params.department = selectedDepartment;
             if (selectedCourse) params.course = selectedCourse;
             if (showArchived) params.archived = true;
+            if (searchQuery && searchQuery.trim() !== '') params.search = searchQuery.trim();
+
+            // Cancel previous pending fetch if any
+            if (fetchCancelSource.current) {
+                try { fetchCancelSource.current.cancel('New request issued'); } catch (c) {}
+                fetchCancelSource.current = null;
+            }
+            fetchCancelSource.current = axios.CancelToken.source();
+
+            // Track request id to ignore out-of-order responses
+            latestRequestId.current += 1;
+            requestId = latestRequestId.current;
+            const requestQuery = searchQuery ? searchQuery.trim() : '';
 
             const response = await axios.get('/api/students', {
                 params,
-                withCredentials: true
+                withCredentials: true,
+                cancelToken: fetchCancelSource.current.token
             });
-            setStudents(response.data || []);
+
+            // only set students if this response is still the latest
+            if (requestId === latestRequestId.current) {
+                setStudents(response.data || []);
+                fetchCancelSource.current = null;
+            } else {
+                // stale response - ignore
+            }
         } catch (error) {
-            console.error('Error fetching students:', error);
-            if (error.response && (error.response.status === 401 || error.response.status === 403)) {
-                window.location.href = '/login';
+            if (axios.isCancel && axios.isCancel(error)) {
+                // cancelled request - ignore
+            } else {
+                console.error('Error fetching students:', error);
+                if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+                    window.location.href = '/login';
+                }
             }
         } finally {
-            setLoading(false);
+            // only clear loading/isSearching for the latest request
+            // if a newer request started, that one will clear the flags
+            // when it finishes.
+            const currentId = latestRequestId.current;
+            try {
+                if (typeof requestId !== 'undefined') {
+                    if (requestId === currentId) {
+                        setLoading(false);
+                        setIsSearching(false);
+                    }
+                } else {
+                    // no requestId (rare) - safe fallback
+                    setLoading(false);
+                    setIsSearching(false);
+                }
+            } catch (e) {
+                setLoading(false);
+                setIsSearching(false);
+            }
         }
     };
 
@@ -189,19 +259,29 @@ export default function Students() {
 
     const handleSubmitAdd = async (e) => {
         e.preventDefault();
+        setFormErrors({});
         try {
             await axios.post('/api/students', formData, { withCredentials: true });
             setShowAddModal(false);
             fetchStudents();
+            // success
             alert('Student added successfully!');
         } catch (error) {
             console.error('Error adding student:', error);
-            alert('Failed to add student. Please try again.');
+            if (error.response && error.response.status === 422 && error.response.data && error.response.data.errors) {
+                // Show validation errors inline
+                setFormErrors(error.response.data.errors || {});
+            } else if (error.response && error.response.data && error.response.data.message) {
+                alert(error.response.data.message);
+            } else {
+                alert('Failed to add student. Please try again.');
+            }
         }
     };
 
     const handleSubmitEdit = async (e) => {
         e.preventDefault();
+        setFormErrors({});
         try {
             await axios.put(`/api/students/${formData.id}`, formData, { withCredentials: true });
             setShowEditModal(false);
@@ -209,7 +289,13 @@ export default function Students() {
             alert('Student updated successfully!');
         } catch (error) {
             console.error('Error updating student:', error);
-            alert('Failed to update student. Please try again.');
+            if (error.response && error.response.status === 422 && error.response.data && error.response.data.errors) {
+                setFormErrors(error.response.data.errors || {});
+            } else if (error.response && error.response.data && error.response.data.message) {
+                alert(error.response.data.message);
+            } else {
+                alert('Failed to update student. Please try again.');
+            }
         }
     };
 
@@ -267,16 +353,54 @@ export default function Students() {
 
     const filteredStudents = students.filter(student => {
         if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        return (
-            student.first_name?.toLowerCase().includes(query) ||
-            student.middle_name?.toLowerCase().includes(query) ||
-            student.last_name?.toLowerCase().includes(query) ||
-            student.id_number?.toLowerCase().includes(query) ||
-            student.email?.toLowerCase().includes(query) ||
-            student.course?.toLowerCase().includes(query) ||
-            student.department?.toLowerCase().includes(query)
-        );
+        const query = searchQuery.toLowerCase().trim();
+
+        // Quick individual-field match
+        const first = student.first_name?.toLowerCase() || '';
+        const middle = student.middle_name?.toLowerCase() || '';
+        const last = student.last_name?.toLowerCase() || '';
+        const idNumber = student.id_number?.toLowerCase() || '';
+        const email = student.email?.toLowerCase() || '';
+        const course = student.course?.toLowerCase() || '';
+        const departmentName = student.department?.toLowerCase() || '';
+
+        // Full name combinations
+        const fullName = [first, middle, last].filter(Boolean).join(' ').trim();
+        const reversedFullName = [last, first].filter(Boolean).join(' ').trim();
+
+        // Direct substring checks (single token queries)
+        if (
+            first.includes(query) ||
+            middle.includes(query) ||
+            last.includes(query) ||
+            idNumber.includes(query) ||
+            email.includes(query) ||
+            course.includes(query) ||
+            departmentName.includes(query) ||
+            fullName.includes(query) ||
+            reversedFullName.includes(query)
+        ) {
+            return true;
+        }
+
+        // Support multi-token queries where tokens may match separate name parts
+        const tokens = query.split(/\s+/).filter(Boolean);
+        if (tokens.length > 1) {
+            // ensure every token matches at least one of the important fields or parts of the full name
+            return tokens.every(tok => (
+                first.includes(tok) ||
+                middle.includes(tok) ||
+                last.includes(tok) ||
+                idNumber.includes(tok) ||
+                email.includes(tok) ||
+                course.includes(tok) ||
+                departmentName.includes(tok) ||
+                fullName.includes(tok) ||
+                reversedFullName.includes(tok)
+            ));
+        }
+
+        return false;
     });
 
     if (loading && !user) {
@@ -400,13 +524,23 @@ export default function Students() {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Search Student
                                 </label>
-                                <input
-                                    type="text"
-                                    placeholder="Search by name, ID, email..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full border rounded-md p-2 bg-white"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name, ID, email..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full border rounded-md p-2 bg-white pr-10"
+                                    />
+                                    {isSearching && (
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                            <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 
@@ -617,6 +751,7 @@ export default function Students() {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                                     <input type="text" required value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} className="w-full border rounded-md p-2" />
+                                        {formErrors.first_name && <p className="text-xs text-red-600 mt-1">{formErrors.first_name[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
@@ -625,14 +760,17 @@ export default function Students() {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
                                     <input type="text" required value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} className="w-full border rounded-md p-2" />
+                                    {formErrors.last_name && <p className="text-xs text-red-600 mt-1">{formErrors.last_name[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">ID Number *</label>
                                     <input type="text" required value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="w-full border rounded-md p-2" />
+                                    {formErrors.id_number && <p className="text-xs text-red-600 mt-1">{formErrors.id_number[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                                     <input type="email" required value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full border rounded-md p-2" />
+                                    {formErrors.email && <p className="text-xs text-red-600 mt-1">{formErrors.email[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
@@ -674,6 +812,7 @@ export default function Students() {
                                             <option key={course.id} value={course.code}>{course.code} - {course.name}</option>
                                         ))}
                                     </select>
+                                    {formErrors.course && <p className="text-xs text-red-600 mt-1">{formErrors.course[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Year Level *</label>
@@ -684,6 +823,7 @@ export default function Students() {
                                         <option value="3">Year 3</option>
                                         <option value="4">Year 4</option>
                                     </select>
+                                    {formErrors.year && <p className="text-xs text-red-600 mt-1">{formErrors.year[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
@@ -693,6 +833,7 @@ export default function Students() {
                                             <option key={dept.id} value={dept.name}>{dept.name}</option>
                                         ))}
                                     </select>
+                                    {formErrors.department && <p className="text-xs text-red-600 mt-1">{formErrors.department[0]}</p>}
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
@@ -721,6 +862,7 @@ export default function Students() {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
                                     <input type="text" required value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} className="w-full border rounded-md p-2" />
+                                        {formErrors.first_name && <p className="text-xs text-red-600 mt-1">{formErrors.first_name[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
@@ -729,14 +871,17 @@ export default function Students() {
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Last Name *</label>
                                     <input type="text" required value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} className="w-full border rounded-md p-2" />
+                                        {formErrors.last_name && <p className="text-xs text-red-600 mt-1">{formErrors.last_name[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">ID Number *</label>
                                     <input type="text" required value={formData.id_number} onChange={(e) => setFormData({...formData, id_number: e.target.value})} className="w-full border rounded-md p-2" />
+                                        {formErrors.id_number && <p className="text-xs text-red-600 mt-1">{formErrors.id_number[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
                                     <input type="email" required value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full border rounded-md p-2" />
+                                        {formErrors.email && <p className="text-xs text-red-600 mt-1">{formErrors.email[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Contact Number</label>
@@ -778,6 +923,7 @@ export default function Students() {
                                             <option key={course.id} value={course.code}>{course.code} - {course.name}</option>
                                         ))}
                                     </select>
+                                        {formErrors.course && <p className="text-xs text-red-600 mt-1">{formErrors.course[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Year Level *</label>
@@ -788,6 +934,7 @@ export default function Students() {
                                         <option value="3">Year 3</option>
                                         <option value="4">Year 4</option>
                                     </select>
+                                        {formErrors.year && <p className="text-xs text-red-600 mt-1">{formErrors.year[0]}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
@@ -797,6 +944,7 @@ export default function Students() {
                                             <option key={dept.id} value={dept.name}>{dept.name}</option>
                                         ))}
                                     </select>
+                                        {formErrors.department && <p className="text-xs text-red-600 mt-1">{formErrors.department[0]}</p>}
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>

@@ -5,6 +5,9 @@ export default function Faculty() {
     const [user, setUser] = useState(null);
     const [faculty, setFaculty] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [isSearchingFaculty, setIsSearchingFaculty] = useState(false);
+    const fetchCancelSourceFaculty = useRef(null);
+    const latestFacultyRequestId = useRef(0);
     const [selectedDepartment, setSelectedDepartment] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedFaculty, setSelectedFaculty] = useState(null);
@@ -46,6 +49,15 @@ export default function Faculty() {
     useEffect(() => {
         fetchFaculty();
     }, [selectedDepartment, showArchived]);
+
+    // Debounced server-side search for faculty
+    useEffect(() => {
+        const delay = 350;
+        const handler = setTimeout(() => {
+            fetchFaculty(true);
+        }, delay);
+        return () => clearTimeout(handler);
+    }, [searchQuery]);
 
     const fetchUser = async (retryCount = 0) => {
         const maxRetries = 1; // Reduce retries
@@ -89,30 +101,74 @@ export default function Faculty() {
         }
     };
 
-    const fetchFaculty = async (retryCount = 0) => {
+    const fetchFaculty = async (silentOrRetry = false, maybeRetry) => {
+        // silentOrRetry: boolean for silent mode OR number for retryCount
+        let silent = false;
+        let retryCount = 0;
+        if (typeof silentOrRetry === 'boolean') {
+            silent = silentOrRetry;
+            retryCount = typeof maybeRetry === 'number' ? maybeRetry : 0;
+        } else {
+            retryCount = typeof silentOrRetry === 'number' ? silentOrRetry : 0;
+        }
+
         const maxRetries = 1; // Reduce retries
+        let requestId;
         try {
-            if (isMountedRef.current) setLoading(true);
+            if (isMountedRef.current) {
+                if (!silent) setLoading(true);
+                else setIsSearchingFaculty(true);
+            }
 
             const params = {};
             if (selectedDepartment) params.department = selectedDepartment;
             if (showArchived) params.archived = true;
+            if (searchQuery && searchQuery.trim() !== '') params.search = searchQuery.trim();
+
+            // cancel previous
+            if (fetchCancelSourceFaculty.current) {
+                try { fetchCancelSourceFaculty.current.cancel('New faculty request'); } catch (c) {}
+                fetchCancelSourceFaculty.current = null;
+            }
+            fetchCancelSourceFaculty.current = axios.CancelToken.source();
+
+            latestFacultyRequestId.current += 1;
+            requestId = latestFacultyRequestId.current;
 
             const response = await axios.get('/api/faculty', {
                 params,
-                withCredentials: true
+                withCredentials: true,
+                cancelToken: fetchCancelSourceFaculty.current.token
             });
 
             if (!isMountedRef.current) return;
 
-            setFaculty(response.data || []);
-            setLoading(false);
+            if (requestId === latestFacultyRequestId.current) {
+                setFaculty(response.data || []);
+                fetchCancelSourceFaculty.current = null;
+            } else {
+                // stale response
+            }
         } catch (error) {
-            console.error('Error fetching faculty:', error);
-            if (!isMountedRef.current) return;
-
-            // Don't redirect on fetch errors - let interceptor handle it
-            if (isMountedRef.current) setLoading(false);
+            if (axios.isCancel && axios.isCancel(error)) {
+                // ignore
+            } else {
+                console.error('Error fetching faculty:', error);
+                if (!isMountedRef.current) return;
+                if (isMountedRef.current && !silent) setLoading(false);
+            }
+        } finally {
+            if (isMountedRef.current) {
+                if (typeof requestId !== 'undefined') {
+                    if (requestId === latestFacultyRequestId.current) {
+                        setLoading(false);
+                        setIsSearchingFaculty(false);
+                    }
+                } else {
+                    setLoading(false);
+                    setIsSearchingFaculty(false);
+                }
+            }
         }
     };
 
@@ -288,16 +344,49 @@ export default function Faculty() {
 
     const filteredFaculty = faculty.filter(facultyMember => {
         if (!searchQuery) return true;
-        const query = searchQuery.toLowerCase();
-        return (
-            facultyMember.first_name?.toLowerCase().includes(query) ||
-            facultyMember.middle_name?.toLowerCase().includes(query) ||
-            facultyMember.last_name?.toLowerCase().includes(query) ||
-            facultyMember.id_number?.toLowerCase().includes(query) ||
-            facultyMember.email?.toLowerCase().includes(query) ||
-            facultyMember.teaching_department?.toLowerCase().includes(query) ||
-            facultyMember.mastery?.toLowerCase().includes(query)
-        );
+        const query = searchQuery.toLowerCase().trim();
+
+        const first = facultyMember.first_name?.toLowerCase() || '';
+        const middle = facultyMember.middle_name?.toLowerCase() || '';
+        const last = facultyMember.last_name?.toLowerCase() || '';
+        const idNumber = facultyMember.id_number?.toLowerCase() || '';
+        const email = facultyMember.email?.toLowerCase() || '';
+        const dept = facultyMember.teaching_department?.toLowerCase() || '';
+        const mastery = facultyMember.mastery?.toLowerCase() || '';
+
+        const fullName = [first, middle, last].filter(Boolean).join(' ').trim();
+        const reversedFullName = [last, first].filter(Boolean).join(' ').trim();
+
+        if (
+            first.includes(query) ||
+            middle.includes(query) ||
+            last.includes(query) ||
+            idNumber.includes(query) ||
+            email.includes(query) ||
+            dept.includes(query) ||
+            mastery.includes(query) ||
+            fullName.includes(query) ||
+            reversedFullName.includes(query)
+        ) {
+            return true;
+        }
+
+        const tokens = query.split(/\s+/).filter(Boolean);
+        if (tokens.length > 1) {
+            return tokens.every(tok => (
+                first.includes(tok) ||
+                middle.includes(tok) ||
+                last.includes(tok) ||
+                idNumber.includes(tok) ||
+                email.includes(tok) ||
+                dept.includes(tok) ||
+                mastery.includes(tok) ||
+                fullName.includes(tok) ||
+                reversedFullName.includes(tok)
+            ));
+        }
+
+        return false;
     });
 
     if (loading && !user) {
@@ -402,13 +491,23 @@ export default function Faculty() {
                                 <label className="block text-sm font-medium text-gray-700 mb-2">
                                     Search Faculty
                                 </label>
-                                <input
-                                    type="text"
-                                    placeholder="Search by name, ID, email..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full border rounded-md p-2 bg-white"
-                                />
+                                <div className="relative">
+                                    <input
+                                        type="text"
+                                        placeholder="Search by name, ID, email..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="w-full border rounded-md p-2 bg-white pr-10"
+                                    />
+                                    {isSearchingFaculty && (
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                                            <svg className="animate-spin h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path>
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
                         </div>
 

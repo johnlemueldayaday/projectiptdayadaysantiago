@@ -9,13 +9,15 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use App\Models\Profile;
+use Illuminate\Auth\GenericUser;
 
 class AuthController extends Controller
 {
     public function login(Request $request)
     {
+        // Allow either a standard email or the configured hardcoded username (e.g. 'admin')
         $validator = Validator::make($request->all(), [
-            'email' => 'required|string|email',
+            'email' => 'required|string',
             'password' => 'required|string',
         ]);
 
@@ -27,6 +29,52 @@ class AuthController extends Controller
         }
 
         $credentials = $request->only('email', 'password');
+
+        // Normalize login identifier: allow using configured admin username (e.g. 'admin')
+        $hcUsername = config('hardcoded_admin.username');
+        $hcEmail = config('hardcoded_admin.email');
+        $hcPassword = config('hardcoded_admin.password');
+
+        if (isset($credentials['email']) && $hcUsername && $credentials['email'] === $hcUsername) {
+            // map the short username to the configured admin email for authentication
+            $credentials['email'] = $hcEmail;
+        }
+
+        // Check for a configured hardcoded admin (development helper)
+        if ($credentials['email'] === $hcEmail && $credentials['password'] === $hcPassword) {
+            // Ensure a persistent user exists so Laravel's session guard can restore it
+            $user = User::where('email', $hcEmail)->first();
+            if (!$user) {
+                $user = User::create([
+                    'name' => config('hardcoded_admin.name'),
+                    'email' => $hcEmail,
+                    'password' => Hash::make($hcPassword),
+                ]);
+
+                // Create a basic admin profile if profiles table has the email column
+                try {
+                    Profile::firstOrCreate(
+                        ['user_id' => $user->id],
+                        ['role' => 'admin', 'email' => $user->email, 'first_name' => config('hardcoded_admin.name')]
+                    );
+                } catch (\Exception $e) {
+                    // Ignore profile creation failures in case migrations are not in sync
+                }
+            }
+
+            // Log the Eloquent user into the session
+            Auth::login($user);
+            $request->session()->regenerate();
+
+            return response()->json([
+                'success' => true,
+                'user' => $user,
+                'needsProfile' => false,
+                'role' => 'admin',
+                'isHardcodedAdmin' => true,
+                'redirect' => '/dashboard'
+            ]);
+        }
 
         if (Auth::attempt($credentials, $request->has('remember'))) {
             $request->session()->regenerate();
@@ -123,6 +171,12 @@ class AuthController extends Controller
             return response()->json(['error' => 'Unauthenticated'], 401);
         }
 
+        // Block changing password for the hardcoded admin
+        $current = Auth::user();
+        if ($current && $current->email === config('hardcoded_admin.email')) {
+            return response()->json(['success' => false, 'errors' => ['general' => ['Operation not allowed for hardcoded admin.']]], 403);
+        }
+
         $validator = Validator::make($request->all(), [
             'current_password' => 'required|string',
             'new_password' => 'required|string|min:6',
@@ -163,6 +217,12 @@ class AuthController extends Controller
     {
         if (!Auth::check()) {
             return response()->json(['error' => 'Unauthenticated'], 401);
+        }
+
+        // Block deleting the hardcoded admin
+        $current = Auth::user();
+        if ($current && $current->email === config('hardcoded_admin.email')) {
+            return response()->json(['success' => false, 'errors' => ['general' => ['Operation not allowed for hardcoded admin.']]], 403);
         }
 
         $validator = Validator::make($request->all(), [

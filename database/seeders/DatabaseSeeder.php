@@ -13,6 +13,21 @@ class DatabaseSeeder extends Seeder
      */
     public function run()
     {
-        // \App\Models\User::factory(10)->create();
+        // Seed base data first
+        $this->call([
+            \Database\Seeders\DepartmentsSeeder::class,
+            \Database\Seeders\CoursesSeeder::class,
+        ]);
+
+        // Ensure hardcoded admin exists (so login won't create it)
+        $this->call([
+            \Database\Seeders\HardcodedAdminSeeder::class,
+        ]);
+
+        // Create faculty and students
+        $this->call([
+            \Database\Seeders\FacultySeeder::class,
+            \Database\Seeders\StudentsSeeder::class,
+        ]);
     }
 }

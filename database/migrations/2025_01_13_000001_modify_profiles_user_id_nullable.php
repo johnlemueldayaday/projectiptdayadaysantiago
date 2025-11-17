@@ -8,15 +8,19 @@ return new class extends Migration
 {
     public function up()
     {
-        Schema::table('profiles', function (Blueprint $table) {
-            $table->unsignedBigInteger('user_id')->nullable()->change();
-        });
+        if (Schema::hasTable('profiles')) {
+            Schema::table('profiles', function (Blueprint $table) {
+                $table->unsignedBigInteger('user_id')->nullable()->change();
+            });
+        }
     }
 
     public function down()
     {
-        Schema::table('profiles', function (Blueprint $table) {
-            $table->unsignedBigInteger('user_id')->nullable(false)->change();
-        });
+        if (Schema::hasTable('profiles')) {
+            Schema::table('profiles', function (Blueprint $table) {
+                $table->unsignedBigInteger('user_id')->nullable(false)->change();
+            });
+        }
     }
 };

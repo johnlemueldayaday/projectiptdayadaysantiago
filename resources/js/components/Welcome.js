@@ -37,7 +37,7 @@ export default function Welcome() {
             const response = await axios.post('/api/login', loginForm);
             if (response.data.success) {
                 const needsProfile = response.data.needsProfile;
-                const redirectPath = needsProfile ? '/profile' : '/home';
+                const redirectPath = needsProfile ? '/profile' : '/dashboard';
                 window.location.href = redirectPath;
             }
         } catch (error) {

@@ -15,6 +15,40 @@ class StudentsController extends Controller
         try {
             $query = DB::table('profiles')->where('role', 'student');
 
+            // Search by query: accept multiple param names and tokenized matching.
+            $search = null;
+            foreach (['q', 'search', 'query', 'term', 'name'] as $param) {
+                if ($request->filled($param)) {
+                    $search = trim($request->input($param));
+                    break;
+                }
+            }
+
+            if ($search !== null && $search !== '') {
+                // split into tokens (space separated) and require ALL tokens to match.
+                // Use CONCAT_WS to include middle_name and check both name orders. Use LOWER for case-insensitive matching.
+                $tokens = preg_split('/\s+/', $search);
+
+                foreach ($tokens as $token) {
+                    $token = trim($token);
+                    if ($token === '') {
+                        continue;
+                    }
+
+                    $like = '%' . mb_strtolower($token, 'UTF-8') . '%';
+
+                    $query->where(function ($q) use ($like) {
+                        // first or last name
+                        $q->whereRaw('LOWER(first_name) LIKE ?', [$like])
+                          ->orWhereRaw('LOWER(last_name) LIKE ?', [$like])
+                          // full name first-middle-last
+                          ->orWhereRaw("LOWER(CONCAT_WS(' ', first_name, middle_name, last_name)) LIKE ?", [$like])
+                          // full name last first
+                          ->orWhereRaw("LOWER(CONCAT_WS(' ', last_name, first_name)) LIKE ?", [$like]);
+                    });
+                }
+            }
+
             // Filter by department
             if ($request->has('department') && $request->department) {
                 $query->where('department', $request->department);
@@ -23,6 +57,11 @@ class StudentsController extends Controller
             // Filter by course
             if ($request->has('course') && $request->course) {
                 $query->where('course', $request->course);
+            }
+
+            // Filter by year level (numeric or string). Reports send year as "1","2", etc.
+            if ($request->has('year') && $request->year !== '') {
+                $query->where('year', $request->year);
             }
 
             // Filter by archived status
@@ -84,8 +123,18 @@ class StudentsController extends Controller
                 ], 422);
             }
 
+            // Ensure there is a linked user account for this student (create if missing)
+            $user = \App\Models\User::where('email', $request->email)->first();
+            if (!$user) {
+                $user = \App\Models\User::create([
+                    'name' => trim(($request->first_name ?? '') . ' ' . ($request->last_name ?? '')),
+                    'email' => $request->email,
+                    'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                ]);
+            }
+
             $studentId = DB::table('profiles')->insertGetId([
-                'user_id' => null,
+                'user_id' => $user ? $user->id : null,
                 'role' => 'student',
                 'first_name' => $request->first_name,
                 'middle_name' => $request->middle_name,
@@ -143,7 +192,35 @@ class StudentsController extends Controller
                 ], 422);
             }
 
+            // Ensure linked user exists or is updated when changing email
+            $profile = DB::table('profiles')->where('id', $id)->first();
+            $userId = $profile ? $profile->user_id : null;
+
+            if ($userId) {
+                $user = \App\Models\User::find($userId);
+                if ($user) {
+                    // update user email/name if changed
+                    $user->name = trim(($request->first_name ?? '') . ' ' . ($request->last_name ?? ''));
+                    $user->email = $request->email;
+                    $user->save();
+                }
+            } else {
+                // If no linked user, create one and attach
+                $existingUser = \App\Models\User::where('email', $request->email)->first();
+                if ($existingUser) {
+                    $userId = $existingUser->id;
+                } else {
+                    $newUser = \App\Models\User::create([
+                        'name' => trim(($request->first_name ?? '') . ' ' . ($request->last_name ?? '')),
+                        'email' => $request->email,
+                        'password' => \Illuminate\Support\Facades\Hash::make('password'),
+                    ]);
+                    $userId = $newUser->id;
+                }
+            }
+
             DB::table('profiles')->where('id', $id)->update([
+                'user_id' => $userId,
                 'first_name' => $request->first_name,
                 'middle_name' => $request->middle_name,
                 'last_name' => $request->last_name,

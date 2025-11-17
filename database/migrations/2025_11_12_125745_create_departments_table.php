@@ -8,13 +8,15 @@ class CreateDepartmentsTable extends Migration
 {
     public function up()
     {
-        Schema::create('departments', function (Blueprint $table) {
-            $table->id();
-            $table->string('name')->unique();
-            $table->text('description')->nullable();
-            $table->boolean('archived')->default(false);
-            $table->timestamps();
-        });
+        if (!Schema::hasTable('departments')) {
+            Schema::create('departments', function (Blueprint $table) {
+                $table->id();
+                $table->string('name')->unique();
+                $table->text('description')->nullable();
+                $table->boolean('archived')->default(false);
+                $table->timestamps();
+            });
+        }
     }
 
     public function down()

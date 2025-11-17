@@ -41,7 +41,7 @@ export default function Login() {
 
                 // Check if profile needs to be completed
                 const needsProfile = response.data.needsProfile;
-                const redirectPath = needsProfile ? '/profile' : '/home';
+                const redirectPath = needsProfile ? '/profile' : '/dashboard';
 
                 // Trigger App.js routing by updating the path
                 window.dispatchEvent(new CustomEvent('navigate', { detail: { path: redirectPath } }));

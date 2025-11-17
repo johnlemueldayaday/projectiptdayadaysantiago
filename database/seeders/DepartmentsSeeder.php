@@ -18,15 +18,17 @@ class DepartmentsSeeder extends Seeder
             ['name' => 'Tourism and Hospitality Management', 'description' => 'Tourism and Hospitality programs'],
             ['name' => 'Arts and Sciences', 'description' => 'Liberal Arts and Sciences programs'],
             ['name' => 'Criminal Justice Education', 'description' => 'Criminology and Criminal Justice programs'],
+            ['name' => 'Computer Studies', 'description' => 'Computer Studies and related IT programs'],
         ];
 
         foreach ($departments as $dept) {
-            DB::table('departments')->insert([
+            DB::table('departments')->updateOrInsert([
                 'name' => $dept['name'],
+            ], [
                 'description' => $dept['description'],
                 'archived' => false,
-                'created_at' => now(),
                 'updated_at' => now(),
+                'created_at' => DB::raw('COALESCE(created_at, NOW())'),
             ]);
         }
     }

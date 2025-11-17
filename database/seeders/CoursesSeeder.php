@@ -43,16 +43,22 @@ class CoursesSeeder extends Seeder
 
             // Criminal Justice Education
             ['code' => 'BSCrim', 'name' => 'Criminology', 'department' => 'Criminal Justice Education'],
+            // Computer & IT related
+            ['code' => 'BSIT', 'name' => 'Information Technology', 'department' => 'Information Technology'],
+            ['code' => 'BSCS', 'name' => 'Computer Science', 'department' => 'Computer Science'],
+            ['code' => 'BSIS', 'name' => 'Information Systems', 'department' => 'Computer Studies'],
+            ['code' => 'AICS', 'name' => 'Associate in Computer Studies', 'department' => 'Computer Studies'],
         ];
 
         foreach ($courses as $course) {
-            DB::table('courses')->insert([
+            DB::table('courses')->updateOrInsert([
                 'code' => $course['code'],
+            ], [
                 'name' => $course['name'],
                 'department' => $course['department'],
                 'archived' => false,
-                'created_at' => now(),
                 'updated_at' => now(),
+                'created_at' => DB::raw('COALESCE(created_at, NOW())'),
             ]);
         }
     }

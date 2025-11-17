@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
+use App\Models\User;
+use Illuminate\Support\Facades\Hash;
 
 class FacultyController extends Controller
 {
@@ -81,8 +83,18 @@ class FacultyController extends Controller
                 ], 422);
             }
 
+            // Ensure there is a linked user account for this faculty (create if missing)
+            $user = User::where('email', $request->email)->first();
+            if (!$user) {
+                $user = User::create([
+                    'name' => trim(($request->first_name ?? '') . ' ' . ($request->last_name ?? '')),
+                    'email' => $request->email,
+                    'password' => Hash::make('password'),
+                ]);
+            }
+
             $facultyId = DB::table('profiles')->insertGetId([
-                'user_id' => null,
+                'user_id' => $user ? $user->id : null,
                 'role' => 'faculty',
                 'first_name' => $request->first_name,
                 'middle_name' => $request->middle_name,

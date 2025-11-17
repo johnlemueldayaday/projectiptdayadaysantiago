@@ -58898,35 +58898,41 @@ function Faculty() {
     _useState6 = _slicedToArray(_useState5, 2),
     loading = _useState6[0],
     setLoading = _useState6[1];
-  var _useState7 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(''),
+  var _useState7 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState8 = _slicedToArray(_useState7, 2),
-    selectedDepartment = _useState8[0],
-    setSelectedDepartment = _useState8[1];
+    isSearchingFaculty = _useState8[0],
+    setIsSearchingFaculty = _useState8[1];
+  var fetchCancelSourceFaculty = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  var latestFacultyRequestId = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(0);
   var _useState9 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(''),
     _useState0 = _slicedToArray(_useState9, 2),
-    searchQuery = _useState0[0],
-    setSearchQuery = _useState0[1];
-  var _useState1 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null),
+    selectedDepartment = _useState0[0],
+    setSelectedDepartment = _useState0[1];
+  var _useState1 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(''),
     _useState10 = _slicedToArray(_useState1, 2),
-    selectedFaculty = _useState10[0],
-    setSelectedFaculty = _useState10[1];
-  var _useState11 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
+    searchQuery = _useState10[0],
+    setSearchQuery = _useState10[1];
+  var _useState11 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null),
     _useState12 = _slicedToArray(_useState11, 2),
-    showFacultyModal = _useState12[0],
-    setShowFacultyModal = _useState12[1];
+    selectedFaculty = _useState12[0],
+    setSelectedFaculty = _useState12[1];
   var _useState13 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState14 = _slicedToArray(_useState13, 2),
-    showAddModal = _useState14[0],
-    setShowAddModal = _useState14[1];
+    showFacultyModal = _useState14[0],
+    setShowFacultyModal = _useState14[1];
   var _useState15 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState16 = _slicedToArray(_useState15, 2),
-    showEditModal = _useState16[0],
-    setShowEditModal = _useState16[1];
+    showAddModal = _useState16[0],
+    setShowAddModal = _useState16[1];
   var _useState17 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState18 = _slicedToArray(_useState17, 2),
-    showArchived = _useState18[0],
-    setShowArchived = _useState18[1];
-  var _useState19 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    showEditModal = _useState18[0],
+    setShowEditModal = _useState18[1];
+  var _useState19 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
+    _useState20 = _slicedToArray(_useState19, 2),
+    showArchived = _useState20[0],
+    setShowArchived = _useState20[1];
+  var _useState21 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
       first_name: '',
       middle_name: '',
       last_name: '',
@@ -58943,13 +58949,13 @@ function Faculty() {
       years_teaching: '',
       year_graduated: ''
     }),
-    _useState20 = _slicedToArray(_useState19, 2),
-    formData = _useState20[0],
-    setFormData = _useState20[1];
-  var _useState21 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
     _useState22 = _slicedToArray(_useState21, 2),
-    departments = _useState22[0],
-    setDepartments = _useState22[1];
+    formData = _useState22[0],
+    setFormData = _useState22[1];
+  var _useState23 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
+    _useState24 = _slicedToArray(_useState23, 2),
+    departments = _useState24[0],
+    setDepartments = _useState24[1];
   var isMountedRef = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(true);
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     isMountedRef.current = true;
@@ -58963,6 +58969,17 @@ function Faculty() {
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     fetchFaculty();
   }, [selectedDepartment, showArchived]);
+
+  // Debounced server-side search for faculty
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    var delay = 350;
+    var handler = setTimeout(function () {
+      fetchFaculty(true);
+    }, delay);
+    return function () {
+      return clearTimeout(handler);
+    };
+  }, [searchQuery]);
   var _fetchUser = /*#__PURE__*/function () {
     var _ref = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
       var retryCount,
@@ -59047,8 +59064,12 @@ function Faculty() {
   }();
   var fetchFaculty = /*#__PURE__*/function () {
     var _ref2 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2() {
-      var retryCount,
+      var silentOrRetry,
+        maybeRetry,
+        silent,
+        retryCount,
         maxRetries,
+        requestId,
         params,
         response,
         _args2 = arguments,
@@ -59056,17 +59077,42 @@ function Faculty() {
       return _regenerator().w(function (_context2) {
         while (1) switch (_context2.p = _context2.n) {
           case 0:
-            retryCount = _args2.length > 0 && _args2[0] !== undefined ? _args2[0] : 0;
+            silentOrRetry = _args2.length > 0 && _args2[0] !== undefined ? _args2[0] : false;
+            maybeRetry = _args2.length > 1 ? _args2[1] : undefined;
+            // silentOrRetry: boolean for silent mode OR number for retryCount
+            silent = false;
+            retryCount = 0;
+            if (typeof silentOrRetry === 'boolean') {
+              silent = silentOrRetry;
+              retryCount = typeof maybeRetry === 'number' ? maybeRetry : 0;
+            } else {
+              retryCount = typeof silentOrRetry === 'number' ? silentOrRetry : 0;
+            }
             maxRetries = 1; // Reduce retries
             _context2.p = 1;
-            if (isMountedRef.current) setLoading(true);
+            if (isMountedRef.current) {
+              if (!silent) setLoading(true);else setIsSearchingFaculty(true);
+            }
             params = {};
             if (selectedDepartment) params.department = selectedDepartment;
             if (showArchived) params.archived = true;
+            if (searchQuery && searchQuery.trim() !== '') params.search = searchQuery.trim();
+
+            // cancel previous
+            if (fetchCancelSourceFaculty.current) {
+              try {
+                fetchCancelSourceFaculty.current.cancel('New faculty request');
+              } catch (c) {}
+              fetchCancelSourceFaculty.current = null;
+            }
+            fetchCancelSourceFaculty.current = axios__WEBPACK_IMPORTED_MODULE_1___default().CancelToken.source();
+            latestFacultyRequestId.current += 1;
+            requestId = latestFacultyRequestId.current;
             _context2.n = 2;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().get('/api/faculty', {
               params: params,
-              withCredentials: true
+              withCredentials: true,
+              cancelToken: fetchCancelSourceFaculty.current.token
             });
           case 2:
             response = _context2.v;
@@ -59076,26 +59122,50 @@ function Faculty() {
             }
             return _context2.a(2);
           case 3:
-            setFaculty(response.data || []);
-            setLoading(false);
-            _context2.n = 6;
+            if (requestId === latestFacultyRequestId.current) {
+              setFaculty(response.data || []);
+              fetchCancelSourceFaculty.current = null;
+            } else {
+              // stale response
+            }
+            _context2.n = 7;
             break;
           case 4:
             _context2.p = 4;
             _t2 = _context2.v;
-            console.error('Error fetching faculty:', _t2);
-            if (isMountedRef.current) {
+            if (!((axios__WEBPACK_IMPORTED_MODULE_1___default().isCancel) && axios__WEBPACK_IMPORTED_MODULE_1___default().isCancel(_t2))) {
               _context2.n = 5;
               break;
             }
-            return _context2.a(2);
+            _context2.n = 7;
+            break;
           case 5:
-            // Don't redirect on fetch errors - let interceptor handle it
-            if (isMountedRef.current) setLoading(false);
+            console.error('Error fetching faculty:', _t2);
+            if (isMountedRef.current) {
+              _context2.n = 6;
+              break;
+            }
+            return _context2.a(2);
           case 6:
+            if (isMountedRef.current && !silent) setLoading(false);
+          case 7:
+            _context2.p = 7;
+            if (isMountedRef.current) {
+              if (typeof requestId !== 'undefined') {
+                if (requestId === latestFacultyRequestId.current) {
+                  setLoading(false);
+                  setIsSearchingFaculty(false);
+                }
+              } else {
+                setLoading(false);
+                setIsSearchingFaculty(false);
+              }
+            }
+            return _context2.f(7);
+          case 8:
             return _context2.a(2);
         }
-      }, _callee2, null, [[1, 4]]);
+      }, _callee2, null, [[1, 4, 7, 8]]);
     }));
     return function fetchFaculty() {
       return _ref2.apply(this, arguments);
@@ -59418,8 +59488,26 @@ function Faculty() {
   var filteredFaculty = faculty.filter(function (facultyMember) {
     var _facultyMember$first_, _facultyMember$middle, _facultyMember$last_n, _facultyMember$id_num, _facultyMember$email, _facultyMember$teachi, _facultyMember$master;
     if (!searchQuery) return true;
-    var query = searchQuery.toLowerCase();
-    return ((_facultyMember$first_ = facultyMember.first_name) === null || _facultyMember$first_ === void 0 ? void 0 : _facultyMember$first_.toLowerCase().includes(query)) || ((_facultyMember$middle = facultyMember.middle_name) === null || _facultyMember$middle === void 0 ? void 0 : _facultyMember$middle.toLowerCase().includes(query)) || ((_facultyMember$last_n = facultyMember.last_name) === null || _facultyMember$last_n === void 0 ? void 0 : _facultyMember$last_n.toLowerCase().includes(query)) || ((_facultyMember$id_num = facultyMember.id_number) === null || _facultyMember$id_num === void 0 ? void 0 : _facultyMember$id_num.toLowerCase().includes(query)) || ((_facultyMember$email = facultyMember.email) === null || _facultyMember$email === void 0 ? void 0 : _facultyMember$email.toLowerCase().includes(query)) || ((_facultyMember$teachi = facultyMember.teaching_department) === null || _facultyMember$teachi === void 0 ? void 0 : _facultyMember$teachi.toLowerCase().includes(query)) || ((_facultyMember$master = facultyMember.mastery) === null || _facultyMember$master === void 0 ? void 0 : _facultyMember$master.toLowerCase().includes(query));
+    var query = searchQuery.toLowerCase().trim();
+    var first = ((_facultyMember$first_ = facultyMember.first_name) === null || _facultyMember$first_ === void 0 ? void 0 : _facultyMember$first_.toLowerCase()) || '';
+    var middle = ((_facultyMember$middle = facultyMember.middle_name) === null || _facultyMember$middle === void 0 ? void 0 : _facultyMember$middle.toLowerCase()) || '';
+    var last = ((_facultyMember$last_n = facultyMember.last_name) === null || _facultyMember$last_n === void 0 ? void 0 : _facultyMember$last_n.toLowerCase()) || '';
+    var idNumber = ((_facultyMember$id_num = facultyMember.id_number) === null || _facultyMember$id_num === void 0 ? void 0 : _facultyMember$id_num.toLowerCase()) || '';
+    var email = ((_facultyMember$email = facultyMember.email) === null || _facultyMember$email === void 0 ? void 0 : _facultyMember$email.toLowerCase()) || '';
+    var dept = ((_facultyMember$teachi = facultyMember.teaching_department) === null || _facultyMember$teachi === void 0 ? void 0 : _facultyMember$teachi.toLowerCase()) || '';
+    var mastery = ((_facultyMember$master = facultyMember.mastery) === null || _facultyMember$master === void 0 ? void 0 : _facultyMember$master.toLowerCase()) || '';
+    var fullName = [first, middle, last].filter(Boolean).join(' ').trim();
+    var reversedFullName = [last, first].filter(Boolean).join(' ').trim();
+    if (first.includes(query) || middle.includes(query) || last.includes(query) || idNumber.includes(query) || email.includes(query) || dept.includes(query) || mastery.includes(query) || fullName.includes(query) || reversedFullName.includes(query)) {
+      return true;
+    }
+    var tokens = query.split(/\s+/).filter(Boolean);
+    if (tokens.length > 1) {
+      return tokens.every(function (tok) {
+        return first.includes(tok) || middle.includes(tok) || last.includes(tok) || idNumber.includes(tok) || email.includes(tok) || dept.includes(tok) || mastery.includes(tok) || fullName.includes(tok) || reversedFullName.includes(tok);
+      });
+    }
+    return false;
   });
   if (loading && !user) {
     return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
@@ -59552,14 +59640,37 @@ function Faculty() {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
                 className: "block text-sm font-medium text-gray-700 mb-2",
                 children: "Search Faculty"
-              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
-                type: "text",
-                placeholder: "Search by name, ID, email...",
-                value: searchQuery,
-                onChange: function onChange(e) {
-                  return setSearchQuery(e.target.value);
-                },
-                className: "w-full border rounded-md p-2 bg-white"
+              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+                className: "relative",
+                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
+                  type: "text",
+                  placeholder: "Search by name, ID, email...",
+                  value: searchQuery,
+                  onChange: function onChange(e) {
+                    return setSearchQuery(e.target.value);
+                  },
+                  className: "w-full border rounded-md p-2 bg-white pr-10"
+                }), isSearchingFaculty && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+                  className: "absolute right-2 top-1/2 -translate-y-1/2",
+                  children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("svg", {
+                    className: "animate-spin h-5 w-5 text-gray-400",
+                    xmlns: "http://www.w3.org/2000/svg",
+                    fill: "none",
+                    viewBox: "0 0 24 24",
+                    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+                      className: "opacity-25",
+                      cx: "12",
+                      cy: "12",
+                      r: "10",
+                      stroke: "currentColor",
+                      strokeWidth: "4"
+                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("path", {
+                      className: "opacity-75",
+                      fill: "currentColor",
+                      d: "M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    })]
+                  })
+                })]
               })]
             })]
           }), (selectedDepartment || searchQuery) && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
@@ -60885,7 +60996,7 @@ function Login() {
           case 3:
             // Check if profile needs to be completed
             needsProfile = response.data.needsProfile;
-            redirectPath = needsProfile ? '/profile' : '/home'; // Trigger App.js routing by updating the path
+            redirectPath = needsProfile ? '/profile' : '/dashboard'; // Trigger App.js routing by updating the path
             window.dispatchEvent(new CustomEvent('navigate', {
               detail: {
                 path: redirectPath
@@ -62522,6 +62633,8 @@ function Reports() {
     _useState16 = _slicedToArray(_useState15, 2),
     departments = _useState16[0],
     setDepartments = _useState16[1];
+  var filtersDebounce = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  var lastGeneratedKey = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
   var reportTypes = [{
     id: 'student-enrollment',
     title: 'Student Report',
@@ -62538,6 +62651,28 @@ function Reports() {
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     _fetchUser();
   }, []);
+
+  // When filters change, if a report type is already selected, auto-generate the report
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    // Only trigger when a report is selected
+    if (!selectedReport) return;
+
+    // Debounce quick successive filter changes
+    if (filtersDebounce.current) clearTimeout(filtersDebounce.current);
+    filtersDebounce.current = setTimeout(function () {
+      // Only regenerate if not currently generating
+      if (!generating && selectedReport) {
+        generateReport(selectedReport.id);
+      }
+    }, 220);
+    return function () {
+      if (filtersDebounce.current) {
+        clearTimeout(filtersDebounce.current);
+        filtersDebounce.current = null;
+      }
+    };
+    // watch specific filter keys that affect reports
+  }, [filters.course, filters.year, filters.department, selectedReport]);
   var _fetchUser = /*#__PURE__*/function () {
     var _ref = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
       var retryCount,
@@ -62642,41 +62777,50 @@ function Reports() {
   }();
   var generateReport = /*#__PURE__*/function () {
     var _ref2 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2(reportId) {
-      var data, _response$data, params, response, _response$data2, _params, _response, statsResponse, _statsResponse$data, _statsResponse, _reportTypes$find, _reportTypes$find2, _t2;
+      var genKey, data, _response$data, params, response, _response$data2, _params, _response, statsResponse, _statsResponse$data, _statsResponse, _reportTypes$find, _reportTypes$find2, _t2;
       return _regenerator().w(function (_context2) {
         while (1) switch (_context2.p = _context2.n) {
           case 0:
+            // prevent duplicate immediate regenerations
+            genKey = "".concat(reportId, "|").concat(JSON.stringify(filters));
+            if (!(lastGeneratedKey.current === genKey)) {
+              _context2.n = 1;
+              break;
+            }
+            return _context2.a(2);
+          case 1:
+            lastGeneratedKey.current = genKey;
             setGenerating(true);
             setReportData(null);
             setSelectedReport(reportTypes.find(function (r) {
               return r.id === reportId;
             }));
-            _context2.p = 1;
-            _context2.n = 2;
+            _context2.p = 2;
+            _context2.n = 3;
             return new Promise(function (resolve) {
               return setTimeout(resolve, 1500);
             });
-          case 2:
+          case 3:
             // Fetch actual data based on report type
             data = null;
             if (!(reportId === 'student-enrollment')) {
-              _context2.n = 4;
+              _context2.n = 5;
               break;
             }
             // Students filtered by course
             params = {};
             if (filters.course) params.course = filters.course;
             if (filters.year) params.year = filters.year;
-            _context2.n = 3;
+            _context2.n = 4;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().get('/api/students', {
               params: params,
               withCredentials: true
             });
-          case 3:
+          case 4:
             response = _context2.v;
             data = {
               type: 'student-enrollment',
-              title: 'Student Enrollment Report',
+              title: 'Student Report',
               generatedAt: new Date().toISOString(),
               filters: {
                 course: filters.course,
@@ -62690,26 +62834,26 @@ function Reports() {
                 byDepartment: groupByDepartment(response.data || [])
               }
             };
-            _context2.n = 11;
+            _context2.n = 12;
             break;
-          case 4:
+          case 5:
             if (!(reportId === 'faculty-assignment')) {
-              _context2.n = 6;
+              _context2.n = 7;
               break;
             }
             // Faculty filtered by department
             _params = {};
             if (filters.department) _params.department = filters.department;
-            _context2.n = 5;
+            _context2.n = 6;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().get('/api/faculty', {
               params: _params,
               withCredentials: true
             });
-          case 5:
+          case 6:
             _response = _context2.v;
             data = {
               type: 'faculty-assignment',
-              title: 'Faculty Assignment Report',
+              title: 'Faculty Report',
               generatedAt: new Date().toISOString(),
               filters: {
                 department: filters.department
@@ -62720,18 +62864,18 @@ function Reports() {
                 byDepartment: groupFacultyByDepartment(_response.data || [])
               }
             };
-            _context2.n = 11;
+            _context2.n = 12;
             break;
-          case 6:
+          case 7:
             if (!(reportId === 'department-statistics')) {
-              _context2.n = 8;
+              _context2.n = 9;
               break;
             }
-            _context2.n = 7;
+            _context2.n = 8;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().get('/api/dashboard/statistics', {
               withCredentials: true
             });
-          case 7:
+          case 8:
             statsResponse = _context2.v;
             data = {
               type: 'department-statistics',
@@ -62739,18 +62883,18 @@ function Reports() {
               generatedAt: new Date().toISOString(),
               data: statsResponse.data || {}
             };
-            _context2.n = 11;
+            _context2.n = 12;
             break;
-          case 8:
+          case 9:
             if (!(reportId === 'year-level-distribution')) {
-              _context2.n = 10;
+              _context2.n = 11;
               break;
             }
-            _context2.n = 9;
+            _context2.n = 10;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().get('/api/dashboard/statistics', {
               withCredentials: true
             });
-          case 9:
+          case 10:
             _statsResponse = _context2.v;
             data = {
               type: 'year-level-distribution',
@@ -62758,9 +62902,9 @@ function Reports() {
               generatedAt: new Date().toISOString(),
               data: ((_statsResponse$data = _statsResponse.data) === null || _statsResponse$data === void 0 ? void 0 : _statsResponse$data.students_by_year) || {}
             };
-            _context2.n = 11;
+            _context2.n = 12;
             break;
-          case 10:
+          case 11:
             // Default report data
             data = {
               type: reportId,
@@ -62772,12 +62916,12 @@ function Reports() {
               data: [],
               message: 'This report type is coming soon!'
             };
-          case 11:
-            setReportData(data);
-            _context2.n = 13;
-            break;
           case 12:
-            _context2.p = 12;
+            setReportData(data);
+            _context2.n = 14;
+            break;
+          case 13:
+            _context2.p = 13;
             _t2 = _context2.v;
             console.error('Error generating report:', _t2);
             setReportData({
@@ -62788,14 +62932,14 @@ function Reports() {
               generatedAt: new Date().toISOString(),
               error: 'Failed to generate report. Please try again.'
             });
-          case 13:
-            _context2.p = 13;
-            setGenerating(false);
-            return _context2.f(13);
           case 14:
+            _context2.p = 14;
+            setGenerating(false);
+            return _context2.f(14);
+          case 15:
             return _context2.a(2);
         }
-      }, _callee2, null, [[1, 12, 13, 14]]);
+      }, _callee2, null, [[2, 13, 14, 15]]);
     }));
     return function generateReport(_x) {
       return _ref2.apply(this, arguments);
@@ -65243,6 +65387,7 @@ function _arrayWithHoles(r) { if (Array.isArray(r)) return r; }
 
 
 function Students() {
+  var _arguments = arguments;
   var _useState = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null),
     _useState2 = _slicedToArray(_useState, 2),
     user = _useState2[0],
@@ -65255,39 +65400,45 @@ function Students() {
     _useState6 = _slicedToArray(_useState5, 2),
     loading = _useState6[0],
     setLoading = _useState6[1];
-  var _useState7 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(''),
+  var _useState7 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState8 = _slicedToArray(_useState7, 2),
-    selectedDepartment = _useState8[0],
-    setSelectedDepartment = _useState8[1];
+    isSearching = _useState8[0],
+    setIsSearching = _useState8[1];
+  var fetchCancelSource = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(null);
+  var latestRequestId = (0,react__WEBPACK_IMPORTED_MODULE_0__.useRef)(0);
   var _useState9 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(''),
     _useState0 = _slicedToArray(_useState9, 2),
-    selectedCourse = _useState0[0],
-    setSelectedCourse = _useState0[1];
+    selectedDepartment = _useState0[0],
+    setSelectedDepartment = _useState0[1];
   var _useState1 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(''),
     _useState10 = _slicedToArray(_useState1, 2),
-    searchQuery = _useState10[0],
-    setSearchQuery = _useState10[1];
-  var _useState11 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null),
+    selectedCourse = _useState10[0],
+    setSelectedCourse = _useState10[1];
+  var _useState11 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(''),
     _useState12 = _slicedToArray(_useState11, 2),
-    selectedStudent = _useState12[0],
-    setSelectedStudent = _useState12[1];
-  var _useState13 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
+    searchQuery = _useState12[0],
+    setSearchQuery = _useState12[1];
+  var _useState13 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(null),
     _useState14 = _slicedToArray(_useState13, 2),
-    showStudentModal = _useState14[0],
-    setShowStudentModal = _useState14[1];
+    selectedStudent = _useState14[0],
+    setSelectedStudent = _useState14[1];
   var _useState15 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState16 = _slicedToArray(_useState15, 2),
-    showAddModal = _useState16[0],
-    setShowAddModal = _useState16[1];
+    showStudentModal = _useState16[0],
+    setShowStudentModal = _useState16[1];
   var _useState17 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState18 = _slicedToArray(_useState17, 2),
-    showEditModal = _useState18[0],
-    setShowEditModal = _useState18[1];
+    showAddModal = _useState18[0],
+    setShowAddModal = _useState18[1];
   var _useState19 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
     _useState20 = _slicedToArray(_useState19, 2),
-    showArchived = _useState20[0],
-    setShowArchived = _useState20[1];
-  var _useState21 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
+    showEditModal = _useState20[0],
+    setShowEditModal = _useState20[1];
+  var _useState21 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)(false),
+    _useState22 = _slicedToArray(_useState21, 2),
+    showArchived = _useState22[0],
+    setShowArchived = _useState22[1];
+  var _useState23 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({
       first_name: '',
       middle_name: '',
       last_name: '',
@@ -65304,17 +65455,21 @@ function Students() {
       year: '',
       department: ''
     }),
-    _useState22 = _slicedToArray(_useState21, 2),
-    formData = _useState22[0],
-    setFormData = _useState22[1];
-  var _useState23 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
     _useState24 = _slicedToArray(_useState23, 2),
-    courses = _useState24[0],
-    setCourses = _useState24[1];
-  var _useState25 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
+    formData = _useState24[0],
+    setFormData = _useState24[1];
+  var _useState25 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)({}),
     _useState26 = _slicedToArray(_useState25, 2),
-    departments = _useState26[0],
-    setDepartments = _useState26[1];
+    formErrors = _useState26[0],
+    setFormErrors = _useState26[1];
+  var _useState27 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
+    _useState28 = _slicedToArray(_useState27, 2),
+    courses = _useState28[0],
+    setCourses = _useState28[1];
+  var _useState29 = (0,react__WEBPACK_IMPORTED_MODULE_0__.useState)([]),
+    _useState30 = _slicedToArray(_useState29, 2),
+    departments = _useState30[0],
+    setDepartments = _useState30[1];
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     _fetchUser();
     fetchStudents();
@@ -65323,6 +65478,19 @@ function Students() {
   (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
     fetchStudents();
   }, [selectedDepartment, selectedCourse, showArchived]);
+
+  // Debounced server-side search: when searchQuery changes, refetch students using server filtering
+  (0,react__WEBPACK_IMPORTED_MODULE_0__.useEffect)(function () {
+    var delay = 350; // ms
+    var handler = setTimeout(function () {
+      // If searchQuery is empty, still fetch to reset results
+      // pass true to make this a "silent" fetch that doesn't toggle the global loading spinner
+      fetchStudents(true);
+    }, delay);
+    return function () {
+      return clearTimeout(handler);
+    };
+  }, [searchQuery]);
   var _fetchUser = /*#__PURE__*/function () {
     var _ref = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee() {
       var retryCount,
@@ -65427,36 +65595,88 @@ function Students() {
   }();
   var fetchStudents = /*#__PURE__*/function () {
     var _ref2 = _asyncToGenerator(/*#__PURE__*/_regenerator().m(function _callee2() {
-      var params, response, _t2;
+      var requestId, args, silent, params, requestQuery, response, currentId, _t2;
       return _regenerator().w(function (_context2) {
         while (1) switch (_context2.p = _context2.n) {
           case 0:
             _context2.p = 0;
-            setLoading(true);
+            // When called as a "silent" fetch (e.g. during typing), avoid toggling global loading
+            // We'll use a small isSearching state instead for subtle UI feedback.
+            args = Array.from(_arguments);
+            silent = args[0] === true; // fetchStudents(true) -> silent
+            if (!silent) {
+              setLoading(true);
+            } else {
+              setIsSearching(true);
+            }
             params = {};
             if (selectedDepartment) params.department = selectedDepartment;
             if (selectedCourse) params.course = selectedCourse;
             if (showArchived) params.archived = true;
+            if (searchQuery && searchQuery.trim() !== '') params.search = searchQuery.trim();
+
+            // Cancel previous pending fetch if any
+            if (fetchCancelSource.current) {
+              try {
+                fetchCancelSource.current.cancel('New request issued');
+              } catch (c) {}
+              fetchCancelSource.current = null;
+            }
+            fetchCancelSource.current = axios__WEBPACK_IMPORTED_MODULE_1___default().CancelToken.source();
+
+            // Track request id to ignore out-of-order responses
+            latestRequestId.current += 1;
+            requestId = latestRequestId.current;
+            requestQuery = searchQuery ? searchQuery.trim() : '';
             _context2.n = 1;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().get('/api/students', {
               params: params,
-              withCredentials: true
+              withCredentials: true,
+              cancelToken: fetchCancelSource.current.token
             });
           case 1:
             response = _context2.v;
-            setStudents(response.data || []);
+            // only set students if this response is still the latest
+            if (requestId === latestRequestId.current) {
+              setStudents(response.data || []);
+              fetchCancelSource.current = null;
+            } else {
+              // stale response - ignore
+            }
             _context2.n = 3;
             break;
           case 2:
             _context2.p = 2;
             _t2 = _context2.v;
-            console.error('Error fetching students:', _t2);
-            if (_t2.response && (_t2.response.status === 401 || _t2.response.status === 403)) {
-              window.location.href = '/login';
+            if ((axios__WEBPACK_IMPORTED_MODULE_1___default().isCancel) && axios__WEBPACK_IMPORTED_MODULE_1___default().isCancel(_t2)) {
+              // cancelled request - ignore
+            } else {
+              console.error('Error fetching students:', _t2);
+              if (_t2.response && (_t2.response.status === 401 || _t2.response.status === 403)) {
+                window.location.href = '/login';
+              }
             }
           case 3:
             _context2.p = 3;
-            setLoading(false);
+            // only clear loading/isSearching for the latest request
+            // if a newer request started, that one will clear the flags
+            // when it finishes.
+            currentId = latestRequestId.current;
+            try {
+              if (typeof requestId !== 'undefined') {
+                if (requestId === currentId) {
+                  setLoading(false);
+                  setIsSearching(false);
+                }
+              } else {
+                // no requestId (rare) - safe fallback
+                setLoading(false);
+                setIsSearching(false);
+              }
+            } catch (e) {
+              setLoading(false);
+              setIsSearching(false);
+            }
             return _context2.f(3);
           case 4:
             return _context2.a(2);
@@ -65590,6 +65810,7 @@ function Students() {
         while (1) switch (_context5.p = _context5.n) {
           case 0:
             e.preventDefault();
+            setFormErrors({});
             _context5.p = 1;
             _context5.n = 2;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().post('/api/students', formData, {
@@ -65598,6 +65819,7 @@ function Students() {
           case 2:
             setShowAddModal(false);
             fetchStudents();
+            // success
             alert('Student added successfully!');
             _context5.n = 4;
             break;
@@ -65605,7 +65827,14 @@ function Students() {
             _context5.p = 3;
             _t5 = _context5.v;
             console.error('Error adding student:', _t5);
-            alert('Failed to add student. Please try again.');
+            if (_t5.response && _t5.response.status === 422 && _t5.response.data && _t5.response.data.errors) {
+              // Show validation errors inline
+              setFormErrors(_t5.response.data.errors || {});
+            } else if (_t5.response && _t5.response.data && _t5.response.data.message) {
+              alert(_t5.response.data.message);
+            } else {
+              alert('Failed to add student. Please try again.');
+            }
           case 4:
             return _context5.a(2);
         }
@@ -65622,6 +65851,7 @@ function Students() {
         while (1) switch (_context6.p = _context6.n) {
           case 0:
             e.preventDefault();
+            setFormErrors({});
             _context6.p = 1;
             _context6.n = 2;
             return axios__WEBPACK_IMPORTED_MODULE_1___default().put("/api/students/".concat(formData.id), formData, {
@@ -65637,7 +65867,13 @@ function Students() {
             _context6.p = 3;
             _t6 = _context6.v;
             console.error('Error updating student:', _t6);
-            alert('Failed to update student. Please try again.');
+            if (_t6.response && _t6.response.status === 422 && _t6.response.data && _t6.response.data.errors) {
+              setFormErrors(_t6.response.data.errors || {});
+            } else if (_t6.response && _t6.response.data && _t6.response.data.message) {
+              alert(_t6.response.data.message);
+            } else {
+              alert('Failed to update student. Please try again.');
+            }
           case 4:
             return _context6.a(2);
         }
@@ -65774,8 +66010,35 @@ function Students() {
   var filteredStudents = students.filter(function (student) {
     var _student$first_name, _student$middle_name, _student$last_name, _student$id_number, _student$email, _student$course, _student$department;
     if (!searchQuery) return true;
-    var query = searchQuery.toLowerCase();
-    return ((_student$first_name = student.first_name) === null || _student$first_name === void 0 ? void 0 : _student$first_name.toLowerCase().includes(query)) || ((_student$middle_name = student.middle_name) === null || _student$middle_name === void 0 ? void 0 : _student$middle_name.toLowerCase().includes(query)) || ((_student$last_name = student.last_name) === null || _student$last_name === void 0 ? void 0 : _student$last_name.toLowerCase().includes(query)) || ((_student$id_number = student.id_number) === null || _student$id_number === void 0 ? void 0 : _student$id_number.toLowerCase().includes(query)) || ((_student$email = student.email) === null || _student$email === void 0 ? void 0 : _student$email.toLowerCase().includes(query)) || ((_student$course = student.course) === null || _student$course === void 0 ? void 0 : _student$course.toLowerCase().includes(query)) || ((_student$department = student.department) === null || _student$department === void 0 ? void 0 : _student$department.toLowerCase().includes(query));
+    var query = searchQuery.toLowerCase().trim();
+
+    // Quick individual-field match
+    var first = ((_student$first_name = student.first_name) === null || _student$first_name === void 0 ? void 0 : _student$first_name.toLowerCase()) || '';
+    var middle = ((_student$middle_name = student.middle_name) === null || _student$middle_name === void 0 ? void 0 : _student$middle_name.toLowerCase()) || '';
+    var last = ((_student$last_name = student.last_name) === null || _student$last_name === void 0 ? void 0 : _student$last_name.toLowerCase()) || '';
+    var idNumber = ((_student$id_number = student.id_number) === null || _student$id_number === void 0 ? void 0 : _student$id_number.toLowerCase()) || '';
+    var email = ((_student$email = student.email) === null || _student$email === void 0 ? void 0 : _student$email.toLowerCase()) || '';
+    var course = ((_student$course = student.course) === null || _student$course === void 0 ? void 0 : _student$course.toLowerCase()) || '';
+    var departmentName = ((_student$department = student.department) === null || _student$department === void 0 ? void 0 : _student$department.toLowerCase()) || '';
+
+    // Full name combinations
+    var fullName = [first, middle, last].filter(Boolean).join(' ').trim();
+    var reversedFullName = [last, first].filter(Boolean).join(' ').trim();
+
+    // Direct substring checks (single token queries)
+    if (first.includes(query) || middle.includes(query) || last.includes(query) || idNumber.includes(query) || email.includes(query) || course.includes(query) || departmentName.includes(query) || fullName.includes(query) || reversedFullName.includes(query)) {
+      return true;
+    }
+
+    // Support multi-token queries where tokens may match separate name parts
+    var tokens = query.split(/\s+/).filter(Boolean);
+    if (tokens.length > 1) {
+      // ensure every token matches at least one of the important fields or parts of the full name
+      return tokens.every(function (tok) {
+        return first.includes(tok) || middle.includes(tok) || last.includes(tok) || idNumber.includes(tok) || email.includes(tok) || course.includes(tok) || departmentName.includes(tok) || fullName.includes(tok) || reversedFullName.includes(tok);
+      });
+    }
+    return false;
   });
   if (loading && !user) {
     return /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
@@ -65928,14 +66191,37 @@ function Students() {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
                 className: "block text-sm font-medium text-gray-700 mb-2",
                 children: "Search Student"
-              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
-                type: "text",
-                placeholder: "Search by name, ID, email...",
-                value: searchQuery,
-                onChange: function onChange(e) {
-                  return setSearchQuery(e.target.value);
-                },
-                className: "w-full border rounded-md p-2 bg-white"
+              }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
+                className: "relative",
+                children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("input", {
+                  type: "text",
+                  placeholder: "Search by name, ID, email...",
+                  value: searchQuery,
+                  onChange: function onChange(e) {
+                    return setSearchQuery(e.target.value);
+                  },
+                  className: "w-full border rounded-md p-2 bg-white pr-10"
+                }), isSearching && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
+                  className: "absolute right-2 top-1/2 -translate-y-1/2",
+                  children: /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("svg", {
+                    className: "animate-spin h-5 w-5 text-gray-400",
+                    xmlns: "http://www.w3.org/2000/svg",
+                    fill: "none",
+                    viewBox: "0 0 24 24",
+                    children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("circle", {
+                      className: "opacity-25",
+                      cx: "12",
+                      cy: "12",
+                      r: "10",
+                      stroke: "currentColor",
+                      strokeWidth: "4"
+                    }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("path", {
+                      className: "opacity-75",
+                      fill: "currentColor",
+                      d: "M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    })]
+                  })
+                })]
               })]
             })]
           }), (selectedCourse || selectedDepartment || searchQuery) && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("div", {
@@ -66222,6 +66508,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.first_name && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.first_name[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66251,6 +66540,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.last_name && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.last_name[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66266,6 +66558,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.id_number && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.id_number[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66281,6 +66576,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.email && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.email[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66406,6 +66704,9 @@ function Students() {
                     children: [course.code, " - ", course.name]
                   }, course.id);
                 })]
+              }), formErrors.course && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.course[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66436,6 +66737,9 @@ function Students() {
                   value: "4",
                   children: "Year 4"
                 })]
+              }), formErrors.year && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.year[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66459,6 +66763,9 @@ function Students() {
                     children: dept.name
                   }, dept.id);
                 })]
+              }), formErrors.department && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.department[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               className: "sm:col-span-2",
@@ -66528,6 +66835,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.first_name && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.first_name[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66557,6 +66867,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.last_name && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.last_name[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66572,6 +66885,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.id_number && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.id_number[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66587,6 +66903,9 @@ function Students() {
                   }));
                 },
                 className: "w-full border rounded-md p-2"
+              }), formErrors.email && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.email[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66712,6 +67031,9 @@ function Students() {
                     children: [course.code, " - ", course.name]
                   }, course.id);
                 })]
+              }), formErrors.course && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.course[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66742,6 +67064,9 @@ function Students() {
                   value: "4",
                   children: "Year 4"
                 })]
+              }), formErrors.year && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.year[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               children: [/*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("label", {
@@ -66765,6 +67090,9 @@ function Students() {
                     children: dept.name
                   }, dept.id);
                 })]
+              }), formErrors.department && /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsx)("p", {
+                className: "text-xs text-red-600 mt-1",
+                children: formErrors.department[0]
               })]
             }), /*#__PURE__*/(0,react_jsx_runtime__WEBPACK_IMPORTED_MODULE_2__.jsxs)("div", {
               className: "sm:col-span-2",
@@ -66919,7 +67247,7 @@ function Welcome() {
             response = _context2.v;
             if (response.data.success) {
               needsProfile = response.data.needsProfile;
-              redirectPath = needsProfile ? '/profile' : '/home';
+              redirectPath = needsProfile ? '/profile' : '/dashboard';
               window.location.href = redirectPath;
             }
             _context2.n = 4;

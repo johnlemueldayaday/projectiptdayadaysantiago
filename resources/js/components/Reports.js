@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 
 export default function Reports() {
@@ -19,6 +19,8 @@ export default function Reports() {
     });
     const [courses, setCourses] = useState([]);
     const [departments, setDepartments] = useState([]);
+    const filtersDebounce = useRef(null);
+    const lastGeneratedKey = useRef(null);
     const reportTypes = [
         {
             id: 'student-enrollment',
@@ -40,6 +42,29 @@ export default function Reports() {
     useEffect(() => {
         fetchUser();
     }, []);
+
+    // When filters change, if a report type is already selected, auto-generate the report
+    useEffect(() => {
+        // Only trigger when a report is selected
+        if (!selectedReport) return;
+
+        // Debounce quick successive filter changes
+        if (filtersDebounce.current) clearTimeout(filtersDebounce.current);
+        filtersDebounce.current = setTimeout(() => {
+            // Only regenerate if not currently generating
+            if (!generating && selectedReport) {
+                generateReport(selectedReport.id);
+            }
+        }, 220);
+
+        return () => {
+            if (filtersDebounce.current) {
+                clearTimeout(filtersDebounce.current);
+                filtersDebounce.current = null;
+            }
+        };
+    // watch specific filter keys that affect reports
+    }, [filters.course, filters.year, filters.department, selectedReport]);
 
     const fetchUser = async (retryCount = 0) => {
         const maxRetries = 2;
@@ -88,6 +113,13 @@ export default function Reports() {
     };
 
     const generateReport = async (reportId) => {
+        // prevent duplicate immediate regenerations
+        const genKey = `${reportId}|${JSON.stringify(filters)}`;
+        if (lastGeneratedKey.current === genKey) {
+            return; // already generated for these filters
+        }
+        lastGeneratedKey.current = genKey;
+
         setGenerating(true);
         setReportData(null);
         setSelectedReport(reportTypes.find(r => r.id === reportId));
@@ -111,7 +143,7 @@ export default function Reports() {
                 });
                 data = {
                     type: 'student-enrollment',
-                    title: 'Student Enrollment Report',
+                    title: 'Student Report',
                     generatedAt: new Date().toISOString(),
                     filters: { course: filters.course, year: filters.year },
                     data: response.data || [],
@@ -133,7 +165,7 @@ export default function Reports() {
                 });
                 data = {
                     type: 'faculty-assignment',
-                    title: 'Faculty Assignment Report',
+                    title: 'Faculty Report',
                     generatedAt: new Date().toISOString(),
                     filters: { department: filters.department },
                     data: response.data || [],
